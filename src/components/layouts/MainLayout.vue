@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   NLayout,
@@ -12,6 +12,7 @@ import {
   NIcon,
   NDivider,
   NAvatar,
+  type MenuOption,
 } from 'naive-ui'
 import {
   HomeOutline,
@@ -30,21 +31,21 @@ const collapsed = ref(false)
 const isDark = ref(true)
 
 // 菜单配置
-const menuOptions = [
+const menuOptions: MenuOption[] = [
   {
     label: '首页',
     key: '/',
-    icon: HomeOutline,
+    icon: () => h(NIcon, null, { default: () => h(HomeOutline) }),
   },
   {
     label: '下载管理',
     key: '/downloads',
-    icon: DownloadOutline,
+    icon: () => h(NIcon, null, { default: () => h(DownloadOutline) }),
   },
   {
     label: '关于',
     key: '/about',
-    icon: InformationCircleOutline,
+    icon: () => h(NIcon, null, { default: () => h(InformationCircleOutline) }),
   },
 ]
 
@@ -92,7 +93,6 @@ const toggleTheme = () => {
         :collapsed-icon-size="22"
         :options="menuOptions"
         :render-label="collapsed ? undefined : undefined"
-        :render-icon="(option) => h(NIcon, null, { default: () => h(option.icon) })"
         @update:value="handleMenuClick"
       />
     </NLayoutSider>

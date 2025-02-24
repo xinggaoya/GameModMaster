@@ -19,7 +19,9 @@
         "resizable": true,
         "title": "GameMod Master",
         "width": 1280,
-        "center": true
+        "center": true,
+        "decorations": false,
+        "transparent": true
       }
     ]
   },

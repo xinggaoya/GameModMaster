@@ -129,12 +129,6 @@ const formatDate = (dateString: string | null | undefined) => {
 </script>
 
 <style scoped>
-.downloads-container {
-  padding: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
 .empty-state {
   padding: 32px;
   text-align: center;

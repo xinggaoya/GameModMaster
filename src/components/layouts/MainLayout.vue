@@ -6,13 +6,12 @@ import {
   NLayoutHeader,
   NLayoutSider,
   NLayoutContent,
-  NMenu,
   NButton,
   NSpace,
   NIcon,
-  NDivider,
   NAvatar,
-  type MenuOption,
+  NTabs,
+  NTab,
 } from 'naive-ui'
 import {
   HomeOutline,
@@ -30,31 +29,31 @@ const route = useRoute()
 const collapsed = ref(false)
 const isDark = ref(true)
 
-// 菜单配置
-const menuOptions: MenuOption[] = [
+// 标签页配置
+const tabs = [
   {
+    name: '/',
     label: '首页',
-    key: '/',
-    icon: () => h(NIcon, null, { default: () => h(HomeOutline) }),
+    icon: HomeOutline,
   },
   {
+    name: '/downloads',
     label: '下载管理',
-    key: '/downloads',
-    icon: () => h(NIcon, null, { default: () => h(DownloadOutline) }),
+    icon: DownloadOutline,
   },
   {
+    name: '/about',
     label: '关于',
-    key: '/about',
-    icon: () => h(NIcon, null, { default: () => h(InformationCircleOutline) }),
+    icon: InformationCircleOutline,
   },
 ]
 
-// 当前激活的菜单项
-const activeKey = computed(() => route.path)
+// 当前激活的标签页
+const activeTab = computed(() => route.path)
 
-// 处理菜单点击
-const handleMenuClick = (key: string) => {
-  router.push(key)
+// 处理标签页切换
+const handleTabChange = (name: string) => {
+  router.push(name)
 }
 
 // 切换主题
@@ -85,16 +84,30 @@ const toggleTheme = () => {
         <img src="/src/assets/logo.png" alt="Logo" class="logo-small" v-else />
       </div>
 
-      <!-- 导航菜单 -->
-      <NMenu
-        :value="activeKey"
-        :collapsed="collapsed"
-        :collapsed-width="64"
-        :collapsed-icon-size="22"
-        :options="menuOptions"
-        :render-label="collapsed ? undefined : undefined"
-        @update:value="handleMenuClick"
-      />
+      <!-- 导航标签页 -->
+      <NTabs
+        v-model:value="activeTab"
+        type="line"
+        :tabs-padding="20"
+        placement="left"
+        @update:value="handleTabChange"
+        class="side-tabs"
+      >
+        <NTab
+          v-for="tab in tabs"
+          :key="tab.name"
+          :name="tab.name"
+          :tab="
+            collapsed
+              ? () => h(NIcon, null, { default: () => h(tab.icon) })
+              : () =>
+                  h('div', { class: 'tab-content' }, [
+                    h(NIcon, null, { default: () => h(tab.icon) }),
+                    h('span', { class: 'tab-label' }, tab.label),
+                  ])
+          "
+        />
+      </NTabs>
     </NLayoutSider>
 
     <!-- 主内容区 -->
@@ -201,6 +214,46 @@ const toggleTheme = () => {
   padding: 24px;
   background: var(--body-color);
   min-height: calc(100vh - 64px);
+}
+
+/* 标签页样式 */
+.side-tabs {
+  padding-top: 16px;
+}
+
+.tab-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.tab-label {
+  font-size: 14px;
+}
+
+:deep(.n-tabs-nav) {
+  width: 100%;
+}
+
+:deep(.n-tabs-nav-scroll-content) {
+  width: 100%;
+}
+
+:deep(.n-tabs-tab-wrapper) {
+  width: 100%;
+}
+
+:deep(.n-tabs-tab) {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 8px 16px;
+}
+
+:deep(.n-tabs-bar) {
+  left: 0;
+  right: unset !important;
+  width: 2px;
 }
 
 /* 过渡动画 */

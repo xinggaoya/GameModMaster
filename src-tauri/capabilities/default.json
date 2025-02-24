@@ -7,6 +7,12 @@
   ],
   "permissions": [
     "core:default",
-    "store:default"
+    "store:default",
+    "core:window:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-toggle-maximize"
   ]
 }

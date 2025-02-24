@@ -21,31 +21,5 @@
     "errorColorPressed": "#CB2A2A",
     "errorColorSuppl": "#CB2A2A",
     "borderRadius": "6px"
-  },
-  "Button": {
-    "borderRadiusMedium": "8px",
-    "borderPressed": "1px solid #1A4BFF",
-    "colorPrimary": "#3366FF",
-    "fontWeightText": "600"
-  },
-  "Input": {
-    "borderFocus": "1px solid #3366FF",
-    "boxShadowFocus": "0 0 0 2px rgba(51, 102, 255, 0.2)",
-    "caretColor": "#3366FF"
-  },
-  "Card": {
-    "borderRadius": "12px",
-    "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.08)"
-  },
-  "Tag": {
-    "borderRadius": "4px",
-    "heightMedium": "28px"
-  },
-  "Alert": {
-    "padding": "12px 16px",
-    "borderRadius": "8px"
-  },
-  "InternalSelection": {
-    "boxShadowActive": "0 4px 8px rgba(51, 102, 255, 0.15)"
   }
 }

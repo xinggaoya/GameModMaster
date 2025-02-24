@@ -47,15 +47,15 @@
                 <NDivider />
 
                 <NSpace class="action-buttons" justify="center" size="large">
-                  <NButton
+                  <n-button
                     type="primary"
                     size="large"
                     :loading="downloading"
                     @click="handleDownload"
                   >
                     {{ isDownloaded ? '重新下载' : '下载修改器' }}
-                  </NButton>
-                  <NButton
+                  </n-button>
+                  <n-button
                     v-if="isDownloaded"
                     type="error"
                     size="large"
@@ -63,7 +63,7 @@
                     @click="handleDelete"
                   >
                     删除
-                  </NButton>
+                  </n-button>
                 </NSpace>
               </div>
             </div>
@@ -168,12 +168,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.detail-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
 .header-container {
   display: flex;
   align-items: center;

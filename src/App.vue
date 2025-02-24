@@ -1,44 +1,41 @@
 <script setup lang="ts">
-import { h, ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { darkTheme, NConfigProvider } from 'naive-ui'
-import { Moon, Sunny, Home, Download } from '@vicons/ionicons5'
+import { ref, computed, onMounted, h } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { darkTheme, NConfigProvider, NTabs, NTab, NIcon, NScrollbar } from 'naive-ui'
+import { Home, Download, InformationCircle } from '@vicons/ionicons5'
 import type { Component } from 'vue'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
+import WindowLayout from '@/components/layouts/WindowLayout.vue'
 
 const router = useRouter()
+const route = useRoute()
 const isDark = ref(true)
-const activeKey = ref('home')
 
 // 根据isDark的值返回主题
 const theme = computed(() => (isDark.value ? darkTheme : null))
 
-const menuOptions = [
+// 标签页配置
+const tabs = [
   {
+    name: '/',
     label: '首页',
-    key: 'home',
-    icon: renderIcon(Home),
-    onClick: () => router.push('/'),
+    icon: Home,
   },
   {
+    name: '/downloads',
     label: '下载管理',
-    key: 'downloads',
-    icon: renderIcon(Download),
-    onClick: () => router.push('/downloads'),
+    icon: Download,
   },
 ]
 
-function renderIcon(icon: Component) {
-  return () => h('div', { class: 'menu-icon' }, h(icon))
+// 当前激活的标签页
+const activeTab = computed(() => route.path)
+
+// 处理标签页切换
+const handleTabChange = (name: string) => {
+  router.push(name)
 }
 
-function toggleTheme() {
-  isDark.value = !isDark.value
-  // 保存主题设置到本地存储
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
-}
-
-// 在组件挂载时读取本地存储的主题设置
 onMounted(() => {
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme) {
@@ -54,32 +51,39 @@ onMounted(() => {
       <n-notification-provider>
         <n-loading-bar-provider>
           <n-dialog-provider>
-            <div class="app-container">
-              <header class="app-header">
-                <div class="logo">
-                  <n-h2>风灵月影管理器</n-h2>
+            <window-layout v-model:isDark="isDark">
+              <n-card class="app-main" content-style="padding: 0;">
+                <NTabs
+                  v-model:value="activeTab"
+                  type="line"
+                  animated
+                  class="nav-tabs"
+                  @update:value="handleTabChange"
+                >
+                  <NTab
+                    v-for="tab in tabs"
+                    :key="tab.name"
+                    :name="tab.name"
+                    :tab="
+                      () =>
+                        h('div', { class: 'tab-content' }, [
+                          h(NIcon, null, { default: () => h(tab.icon) }),
+                          h('span', { class: 'tab-label' }, tab.label),
+                        ])
+                    "
+                  />
+                </NTabs>
+                <div style="height: calc(100vh - 87px)">
+                  <n-scrollbar class="app-content" trigger="none">
+                    <router-view v-slot="{ Component }">
+                      <transition name="fade" mode="out-in">
+                        <component :is="Component" />
+                      </transition>
+                    </router-view>
+                  </n-scrollbar>
                 </div>
-                <n-menu v-model:value="activeKey" mode="horizontal" :options="menuOptions" />
-                <div class="actions">
-                  <n-button circle @click="toggleTheme">
-                    <template #icon>
-                      <n-icon>
-                        <Moon v-if="isDark" />
-                        <Sunny v-else />
-                      </n-icon>
-                    </template>
-                  </n-button>
-                </div>
-              </header>
-
-              <main class="app-content">
-                <router-view v-slot="{ Component }">
-                  <transition name="fade" mode="out-in">
-                    <component :is="Component" />
-                  </transition>
-                </router-view>
-              </main>
-            </div>
+              </n-card>
+            </window-layout>
           </n-dialog-provider>
         </n-loading-bar-provider>
       </n-notification-provider>
@@ -103,51 +107,50 @@ body,
   overflow: hidden;
 }
 
-/* 应用容器 */
-.app-container {
-  height: 100vh;
-  width: 100vw;
+/* 应用主内容 */
+.app-main {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--body-color);
 }
 
-/* 头部样式 */
-.app-header {
-  height: 64px;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* 导航标签页 */
+.nav-tabs {
+  padding: 0 16px;
   border-bottom: 1px solid var(--divider-color);
   background-color: var(--card-color);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
   flex-shrink: 0;
 }
 
-.actions {
+.tab-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  line-height: 1;
+}
+
+.tab-content :deep(.n-icon) {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
+  justify-content: center;
+  margin-top: -2px;
+}
+
+.tab-label {
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* 内容区域 */
 .app-content {
   flex: 1;
-  overflow-y: auto;
   padding: 20px;
   background-color: var(--body-color);
 }
 
-.menu-icon {
-  display: flex;
-  align-items: center;
-  margin-right: 6px;
+.app-content :deep(.n-scrollbar-container) {
+  padding-right: 16px;
 }
 
 /* 过渡动画 */
@@ -168,6 +171,16 @@ body,
 :deep(.n-notification-provider),
 :deep(.n-loading-bar-provider),
 :deep(.n-dialog-provider) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.n-card) {
+  height: 100%;
+}
+
+:deep(.n-card-content) {
   height: 100%;
   display: flex;
   flex-direction: column;

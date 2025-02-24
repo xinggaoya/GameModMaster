@@ -14,7 +14,9 @@ declare module 'vue' {
     IconSupport: typeof import('./src/components/icons/IconSupport.vue')['default']
     IconTooling: typeof import('./src/components/icons/IconTooling.vue')['default']
     MainLayout: typeof import('./src/components/layouts/MainLayout.vue')['default']
+    NAvatar: typeof import('naive-ui')['NAvatar']
     NButton: typeof import('naive-ui')['NButton']
+    NCard: typeof import('naive-ui')['NCard']
     NDialogProvider: typeof import('naive-ui')['NDialogProvider']
     NGlobalStyle: typeof import('naive-ui')['NGlobalStyle']
     NH2: typeof import('naive-ui')['NH2']
@@ -26,6 +28,8 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TheWelcome: typeof import('./src/components/TheWelcome.vue')['default']
+    TitleBar: typeof import('./src/components/TitleBar.vue')['default']
     WelcomeItem: typeof import('./src/components/WelcomeItem.vue')['default']
+    WindowLayout: typeof import('./src/components/layouts/WindowLayout.vue')['default']
   }
 }

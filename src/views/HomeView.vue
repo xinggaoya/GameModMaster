@@ -53,7 +53,7 @@ onMounted(async () => {
   <div class="home-container">
     <!-- 搜索区域 -->
     <div class="search-section">
-      <NCard>
+      <NCard content-style="padding: 0;">
         <NInputGroup>
           <NInput
             v-model:value="searchQuery"
@@ -65,7 +65,9 @@ onMounted(async () => {
               <NIcon><Search /></NIcon>
             </template>
           </NInput>
-          <NButton type="primary" @click="handleSearch" :loading="store.isLoading"> 搜索 </NButton>
+          <n-button type="primary" @click="handleSearch" :loading="store.isLoading" ghost>
+            搜索
+          </n-button>
         </NInputGroup>
       </NCard>
     </div>
@@ -165,7 +167,6 @@ onMounted(async () => {
   top: 0;
   z-index: 1;
   backdrop-filter: blur(10px);
-  padding: 16px 0;
 }
 
 .content-section {

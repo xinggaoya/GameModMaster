@@ -1,39 +1,93 @@
-# tauri-demo
+# GameModMaster (游戏修改器大师)
 
-This template should help get you started developing with Vue 3 in Vite.
+<div align="center">
 
-## Recommended IDE Setup
+<img src="./src/assets/logo.png" alt="GameModMaster Logo" width="200" style="margin: 20px 0" />
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+[![GitHub license](https://img.shields.io/github/license/xinggaoya/GameModMaster)](https://github.com/xinggaoya/GameModMaster/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/xinggaoya/GameModMaster)](https://github.com/xinggaoya/GameModMaster/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/xinggaoya/GameModMaster)](https://github.com/xinggaoya/GameModMaster/issues)
 
-## Type Support for `.vue` Imports in TS
+</div>
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## 📸 预览
 
-## Customize configuration
+<div align="center">
+  <img src="./src/assets/image.png" alt="GameModMaster 预览图" width="800" />
+</div>
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## 📝 项目介绍
 
-## Project Setup
+GameModMaster 是一个强大的风灵月影游戏修改器管理工具，使用 Tauri + Vue 3 + TypeScript 开发。它提供了一个现代化的界面来管理和使用各种游戏修改器，让游戏体验更加丰富多彩。
 
-```sh
-npm install
+### ✨ 主要特性
+
+- 🎮 支持多种游戏修改器管理
+- 🔒 安全的修改器运行环境
+- 🌈 美观的用户界面
+- 🚀 高性能的本地应用
+- 💾 本地数据存储
+- 🔄 自动更新功能
+
+## 🛠️ 技术栈
+
+- [Tauri](https://tauri.app/) - 构建跨平台应用
+- [Vue 3](https://vuejs.org/) - 前端框架
+- [TypeScript](https://www.typescriptlang.org/) - 类型安全
+- [Naive UI](https://www.naiveui.com/) - UI 组件库
+- [Vite](https://vitejs.dev/) - 构建工具
+- [Pinia](https://pinia.vuejs.org/) - 状态管理
+
+## 📦 安装
+
+```bash
+# 克隆项目
+git clone https://github.com/xinggaoya/GameModMaster.git
+
+# 进入项目目录
+cd GameModMaster
+
+# 安装依赖
+pnpm install
+
+# 启动开发服务器
+pnpm tauri dev
+
+# 构建生产版本
+pnpm tauri build
 ```
 
-### Compile and Hot-Reload for Development
+## 🚀 使用指南
 
-```sh
-npm run dev
-```
+1. 下载并安装最新版本
+2. 启动应用程序
+3. 添加你的游戏修改器
+4. 享受游戏吧！
 
-### Type-Check, Compile and Minify for Production
+## 🤝 贡献指南
 
-```sh
-npm run build
-```
+欢迎提交 Pull Request 或创建 Issue！
 
-### Lint with [ESLint](https://eslint.org/)
+1. Fork 本仓库
+2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交你的更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开一个 Pull Request
 
-```sh
-npm run lint
-```
+## 📄 许可证
+
+本项目使用 [MIT](LICENSE) 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+
+## 👨‍💻 作者
+
+[@xinggaoya](https://github.com/xinggaoya)
+
+## 🙏 鸣谢
+
+- [Tauri](https://tauri.app/)
+- [Vue.js](https://vuejs.org/)
+- [Naive UI](https://www.naiveui.com/)
+
+---
+
+如果这个项目对你有帮助，请给它一个 ⭐️

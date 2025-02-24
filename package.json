@@ -45,6 +45,7 @@
     "typescript": "~5.7.3",
     "unplugin-auto-import": "^0.17.5",
     "unplugin-vue-components": "^0.26.0",
+    "vfonts": "^0.0.3",
     "vite": "^6.1.0",
     "vite-plugin-vue-devtools": "^7.7.2",
     "vue-tsc": "^2.2.2"

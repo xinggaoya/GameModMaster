@@ -47,6 +47,7 @@ export const useTrainerStore = defineStore('trainer', () => {
   const error = ref<string | null>(null)
   const searchQuery = ref('')
   const currentPage = ref(1)
+  const totalPages = ref(1)
 
   // 初始化函数
   async function initialize() {
@@ -182,13 +183,18 @@ export const useTrainerStore = defineStore('trainer', () => {
 
   const fetchTrainers = async (page: number = 1) => {
     console.log('Store: 开始获取修改器列表', { page })
+    isLoading.value = true
     try {
-      const result = await invoke<Trainer[]>('fetch_trainers', { page })
-      console.log('Store: 获取修改器列表成功', { count: result?.length })
-      // 确保结果是数组
-      if (Array.isArray(result)) {
-        trainers.value = result
+      const result = await invoke<{ trainers: Trainer[]; total: number }>('fetch_trainers', {
+        page,
+      })
+      console.log('Store: 获取修改器列表成功', { count: result?.trainers?.length })
+
+      if (result && Array.isArray(result.trainers)) {
+        trainers.value = result.trainers
         currentPage.value = page
+        // 计算总页数
+        totalPages.value = Math.ceil(result.total / 12) // 每页固定12条
       } else {
         throw new Error('返回数据格式错误')
       }
@@ -197,6 +203,8 @@ export const useTrainerStore = defineStore('trainer', () => {
       error.value = err instanceof Error ? err.message : '获取修改器列表失败'
       window.$message?.error('获取修改器列表失败')
       throw err
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -204,8 +212,16 @@ export const useTrainerStore = defineStore('trainer', () => {
     isLoading.value = true
     try {
       searchQuery.value = query
-      const result = await invoke<Trainer[]>('search_trainers', { query })
-      trainers.value = result
+      currentPage.value = 1 // 重置页码
+      const result = await invoke<{ trainers: Trainer[]; total: number }>('search_trainers', {
+        query,
+        page: currentPage.value,
+      })
+
+      if (result) {
+        trainers.value = result.trainers
+        totalPages.value = Math.ceil(result.total / 12) // 每页固定12条
+      }
     } catch (error) {
       console.error('Failed to search trainers:', error)
       window.$message?.error('搜索修改器失败')
@@ -315,6 +331,7 @@ export const useTrainerStore = defineStore('trainer', () => {
     error,
     searchQuery,
     currentPage,
+    totalPages,
 
     // 方法
     initialize,

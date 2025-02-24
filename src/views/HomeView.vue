@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
@@ -26,33 +26,25 @@ const router = useRouter()
 const store = useTrainerStore()
 
 const searchQuery = ref('')
-const currentPage = ref(1)
-const totalPages = ref(10) // TODO: 从后端获取总页数
-const downloading = ref<string | null>(null)
+const totalPages = computed(() => store.totalPages)
 
 const handleSearch = () => {
+  store.currentPage = 1 // 搜索时重置页码
   store.searchTrainers(searchQuery.value)
 }
 
-const handlePageChange = (page: number) => {
-  store.fetchTrainers(page)
-}
-
-const handleDownload = async (trainer: Trainer) => {
-  if (downloading.value) return
-  downloading.value = trainer.id
+const handlePageChange = async (page: number) => {
   try {
-    await store.downloadTrainer(trainer)
-    window.$message?.success('下载成功')
+    store.currentPage = page
+    await store.fetchTrainers(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' }) // 滚动到顶部
   } catch (error) {
-    window.$message?.error('下载失败')
-  } finally {
-    downloading.value = null
+    window.$message?.error('获取数据失败')
   }
 }
 
-onMounted(() => {
-  store.initialize()
+onMounted(async () => {
+  await store.initialize()
 })
 </script>
 
@@ -136,15 +128,6 @@ onMounted(() => {
                       >
                         详情
                       </NButton>
-                      <NButton
-                        type="success"
-                        size="small"
-                        :loading="downloading === trainer.id"
-                        :disabled="downloading !== null"
-                        @click="handleDownload(trainer)"
-                      >
-                        下载
-                      </NButton>
                     </NSpace>
                   </div>
                 </div>
@@ -154,7 +137,7 @@ onMounted(() => {
 
           <div class="pagination-container">
             <NPagination
-              v-model:page="currentPage"
+              v-model:page="store.currentPage"
               :page-count="totalPages"
               :on-update:page="handlePageChange"
             />

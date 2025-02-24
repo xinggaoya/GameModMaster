@@ -1,7 +1,8 @@
-use crate::{AppError, Trainer};
+use crate::api::error::{AppError, AppResult};
+use crate::models::trainer::Trainer;
 use scraper::{Html, Selector};
 
-pub fn parse_trainer_list(html: &str) -> Result<Vec<Trainer>, AppError> {
+pub fn parse_trainer_list(html: &str) -> AppResult<Vec<Trainer>> {
     let document = Html::parse_document(html);
     let article_selector = Selector::parse("article.post-standard")
         .map_err(|e| AppError::ParseError(e.to_string()))?;
@@ -96,7 +97,7 @@ pub fn parse_trainer_list(html: &str) -> Result<Vec<Trainer>, AppError> {
     Ok(trainers)
 }
 
-pub fn parse_trainer_detail(html: &str) -> Result<Trainer, AppError> {
+pub fn parse_trainer_detail(html: &str) -> AppResult<Trainer> {
     let document = Html::parse_document(html);
 
     // 提取标题

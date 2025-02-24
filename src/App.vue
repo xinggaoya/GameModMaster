@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { darkTheme, NConfigProvider } from 'naive-ui'
 import { Moon, Sunny, Home, Download } from '@vicons/ionicons5'
 import type { Component } from 'vue'
+import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 
 const router = useRouter()
 const isDark = ref(true)
@@ -47,7 +48,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <n-config-provider :theme="theme">
+  <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
     <n-global-style />
     <n-message-provider>
       <n-notification-provider>

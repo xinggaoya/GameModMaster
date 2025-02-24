@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
@@ -16,10 +16,11 @@ import {
   NText,
   NImage,
   NEmpty,
-  NTag,
   NEllipsis,
   NSpin,
   NPagination,
+  NTag,
+  NTooltip,
 } from 'naive-ui'
 
 const router = useRouter()
@@ -50,27 +51,27 @@ onMounted(async () => {
 
 <template>
   <div class="home-container">
-    <NCard>
-      <template #header>
-        <div class="header-container">
-          <h2>游戏修改器</h2>
-          <NInputGroup>
-            <NInput
-              v-model:value="searchQuery"
-              placeholder="搜索游戏修改器..."
-              @keydown.enter="handleSearch"
-              clearable
-            />
-            <NButton type="primary" @click="handleSearch" :disabled="store.isLoading">
-              <template #icon>
-                <NIcon><Search /></NIcon>
-              </template>
-              搜索
-            </NButton>
-          </NInputGroup>
-        </div>
-      </template>
+    <!-- 搜索区域 -->
+    <div class="search-section">
+      <NCard>
+        <NInputGroup>
+          <NInput
+            v-model:value="searchQuery"
+            placeholder="搜索游戏修改器..."
+            @keydown.enter="handleSearch"
+            clearable
+          >
+            <template #prefix>
+              <NIcon><Search /></NIcon>
+            </template>
+          </NInput>
+          <NButton type="primary" @click="handleSearch" :loading="store.isLoading"> 搜索 </NButton>
+        </NInputGroup>
+      </NCard>
+    </div>
 
+    <!-- 内容区域 -->
+    <div class="content-section">
       <NSpin :show="store.isLoading">
         <div v-if="store.error" class="error-message">
           {{ store.error }}
@@ -83,7 +84,11 @@ onMounted(async () => {
         <template v-else>
           <NGrid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
             <NGridItem v-for="trainer in store.trainers" :key="trainer.id">
-              <NCard class="trainer-card" hoverable>
+              <NCard
+                class="trainer-card"
+                hoverable
+                @click="router.push({ name: 'detail', params: { id: trainer.id } })"
+              >
                 <template #cover>
                   <div class="image-container">
                     <NImage
@@ -92,49 +97,47 @@ onMounted(async () => {
                       class="trainer-image"
                       :preview-disabled="true"
                       fallback-src="/placeholder.png"
+                      object-fit="cover"
                     />
+                    <div class="image-overlay">
+                      <NButton quaternary circle class="detail-button">
+                        <template #icon>
+                          <NIcon><Search /></NIcon>
+                        </template>
+                      </NButton>
+                    </div>
                   </div>
                 </template>
+
                 <div class="card-content">
-                  <NEllipsis :line-clamp="1" class="trainer-name">
-                    {{ trainer.name }}
-                  </NEllipsis>
-                  <div class="trainer-info">
-                    <NSpace vertical size="small">
-                      <NText depth="3" class="info-text">
-                        <span class="label">版本:</span>
-                        <NEllipsis style="max-width: 150px; display: inline-block">
-                          {{ trainer.version }}
-                        </NEllipsis>
-                      </NText>
-                      <NText depth="3" class="info-text">
-                        <span class="label">游戏版本:</span>
-                        <NEllipsis style="max-width: 150px; display: inline-block">
-                          {{ trainer.game_version }}
-                        </NEllipsis>
-                      </NText>
-                      <NText depth="3" class="info-text">
-                        <span class="label">更新时间:</span>
-                        {{ new Date(trainer.last_update).toLocaleDateString() }}
-                      </NText>
-                    </NSpace>
+                  <div class="trainer-header">
+                    <NEllipsis :line-clamp="1" class="trainer-name">
+                      {{ trainer.name }}
+                    </NEllipsis>
+                    <NTag size="small" :bordered="false" type="success">
+                      {{ trainer.version }}
+                    </NTag>
                   </div>
-                  <div class="trainer-actions">
-                    <NSpace justify="end">
-                      <NButton
-                        type="primary"
-                        size="small"
-                        @click="router.push({ name: 'detail', params: { id: trainer.id } })"
-                      >
-                        详情
-                      </NButton>
-                    </NSpace>
+
+                  <div class="trainer-info">
+                    <NTooltip trigger="hover">
+                      <template #trigger>
+                        <NText depth="3" class="game-version">
+                          支持游戏版本: {{ trainer.game_version }}
+                        </NText>
+                      </template>
+                      {{ trainer.game_version }}
+                    </NTooltip>
+                    <NText depth="3" class="update-time">
+                      更新于: {{ new Date(trainer.last_update).toLocaleDateString() }}
+                    </NText>
                   </div>
                 </div>
               </NCard>
             </NGridItem>
           </NGrid>
 
+          <!-- 分页 -->
           <div class="pagination-container">
             <NPagination
               v-model:page="store.currentPage"
@@ -144,39 +147,40 @@ onMounted(async () => {
           </div>
         </template>
       </NSpin>
-    </NCard>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .home-container {
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.header-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.search-section {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  backdrop-filter: blur(10px);
+  padding: 16px 0;
 }
 
-.error-message {
-  text-align: center;
-  color: var(--error-color);
-  padding: 20px;
-}
-
-.empty-state {
-  padding: 40px;
-  text-align: center;
+.content-section {
+  flex: 1;
 }
 
 .trainer-card {
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.trainer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .image-container {
@@ -192,47 +196,89 @@ onMounted(async () => {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.trainer-card:hover .image-overlay {
+  opacity: 1;
+}
+
+.trainer-card:hover .trainer-image {
+  transform: scale(1.05);
+}
+
+.detail-button {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(4px);
+}
+
+.detail-button:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 .card-content {
+  padding: 16px;
+}
+
+.trainer-header {
   display: flex;
-  flex-direction: column;
-  flex: 1;
-  padding: 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .trainer-name {
   font-size: 1.1em;
   font-weight: 600;
-  margin-bottom: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .trainer-info {
-  flex: 1;
-  margin-bottom: 12px;
-}
-
-.info-text {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
+}
+
+.game-version,
+.update-time {
   font-size: 0.9em;
-}
-
-.label {
-  color: var(--text-color-3);
   white-space: nowrap;
-}
-
-.trainer-actions {
-  margin-top: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 24px;
   display: flex;
   justify-content: center;
+}
+
+.error-message {
+  text-align: center;
+  color: var(--error-color);
+  padding: 20px;
+}
+
+.empty-state {
+  padding: 40px;
+  text-align: center;
 }
 
 /* 响应式布局 */
@@ -247,9 +293,16 @@ onMounted(async () => {
     --cols: 1 !important;
   }
 
-  .header-container {
-    flex-direction: column;
+  .home-container {
     gap: 16px;
+  }
+
+  .search-section {
+    padding: 8px 0;
+  }
+
+  .card-content {
+    padding: 12px;
   }
 }
 </style>

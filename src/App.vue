@@ -57,7 +57,7 @@ onMounted(() => {
             <div class="app-container">
               <header class="app-header">
                 <div class="logo">
-                  <n-h2>游戏修改器管理器</n-h2>
+                  <n-h2>风灵月影管理器</n-h2>
                 </div>
                 <n-menu v-model:value="activeKey" mode="horizontal" :options="menuOptions" />
                 <div class="actions">

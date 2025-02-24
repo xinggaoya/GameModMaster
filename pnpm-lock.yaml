@@ -14,9 +14,6 @@ importers:
       '@tauri-apps/plugin-store':
         specifier: ^2.2.0
         version: 2.2.0
-      '@vicons/ionicons5':
-        specifier: ^0.12.0
-        version: 0.12.0
       axios:
         specifier: ^1.6.7
         version: 1.7.9
@@ -45,6 +42,9 @@ importers:
       '@types/node':
         specifier: ^22.13.4
         version: 22.13.5
+      '@vicons/ionicons5':
+        specifier: ^0.12.0
+        version: 0.12.0
       '@vitejs/plugin-vue':
         specifier: ^5.2.1
         version: 5.2.1(vite@6.1.1(@types/node@22.13.5)(jiti@2.4.2))(vue@3.5.13(typescript@5.7.3))

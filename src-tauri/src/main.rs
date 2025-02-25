@@ -14,7 +14,10 @@ fn main() {
             api::trainer::get_trainer_detail,
             api::trainer::download_trainer,
             api::trainer::delete_trainer,
-            api::trainer::launch_trainer
+            api::trainer::launch_trainer,
+            api::updater::check_update,
+            api::updater::download_and_install_update,
+            api::updater::get_app_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

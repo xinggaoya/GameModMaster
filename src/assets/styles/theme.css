@@ -1,0 +1,220 @@
+:root {
+  /* 基础颜色变量 */
+  --primary-color: #18a058;
+  --primary-color-hover: #36ad6a;
+  --primary-color-pressed: #0c7a43;
+  --primary-color-light: rgba(24, 160, 88, 0.1);
+
+  --success-color: #18a058;
+  --warning-color: #f0a020;
+  --error-color: #d03050;
+  --info-color: #2080f0;
+
+  /* 亮色主题 */
+  --light-body-color: #f5f7fa;
+  --light-card-color: #ffffff;
+  --light-text-color: #333333;
+  --light-text-color-secondary: #666666;
+  --light-border-color: #eaeaea;
+  --light-divider-color: #eeeeee;
+  --light-shadow-color: rgba(0, 0, 0, 0.08);
+  --light-background-color: #ffffff;
+  --light-hover-color: rgba(0, 0, 0, 0.04);
+  --light-active-color: rgba(0, 0, 0, 0.08);
+
+  /* 暗色主题 */
+  --dark-body-color: #121212;
+  --dark-card-color: #1e1e1e;
+  --dark-text-color: #e0e0e0;
+  --dark-text-color-secondary: #a0a0a0;
+  --dark-border-color: #333333;
+  --dark-divider-color: #333333;
+  --dark-shadow-color: rgba(0, 0, 0, 0.3);
+  --dark-background-color: #252525;
+  --dark-hover-color: rgba(255, 255, 255, 0.1);
+  --dark-active-color: rgba(255, 255, 255, 0.15);
+
+  /* 过渡相关 */
+  --transition-duration: 0.3s;
+  --transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 默认使用亮色主题 */
+  --body-color: var(--light-body-color);
+  --card-color: var(--light-card-color);
+  --text-color: var(--light-text-color);
+  --text-color-secondary: var(--light-text-color-secondary);
+  --border-color: var(--light-border-color);
+  --divider-color: var(--light-divider-color);
+  --shadow-color: var(--light-shadow-color);
+  --background-color: var(--light-background-color);
+  --hover-color: var(--light-hover-color);
+  --active-color: var(--light-active-color);
+
+  /* 尺寸变量 */
+  --header-height: 64px;
+  --footer-height: 48px;
+  --sidebar-width: 250px;
+  --border-radius-small: 4px;
+  --border-radius-medium: 8px;
+  --border-radius-large: 12px;
+
+  /* 间距变量 */
+  --spacing-mini: 4px;
+  --spacing-small: 8px;
+  --spacing-base: 16px;
+  --spacing-large: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+
+  /* 字体大小变量 */
+  --font-size-mini: 12px;
+  --font-size-small: 14px;
+  --font-size-base: 16px;
+  --font-size-large: 18px;
+  --font-size-xl: 20px;
+  --font-size-xxl: 24px;
+
+  /* Z-index层级变量 */
+  --z-index-dropdown: 100;
+  --z-index-sticky: 200;
+  --z-index-fixed: 300;
+  --z-index-modal-backdrop: 400;
+  --z-index-modal: 500;
+  --z-index-popover: 600;
+  --z-index-tooltip: 700;
+}
+
+/* 暗色主题类 */
+.dark-theme {
+  --body-color: var(--dark-body-color);
+  --card-color: var(--dark-card-color);
+  --text-color: var(--dark-text-color);
+  --text-color-secondary: var(--dark-text-color-secondary);
+  --border-color: var(--dark-border-color);
+  --divider-color: var(--dark-divider-color);
+  --shadow-color: var(--dark-shadow-color);
+  --background-color: var(--dark-background-color);
+  --hover-color: var(--dark-hover-color);
+  --active-color: var(--dark-active-color);
+}
+
+/* 强制亮色元素 - 在暗色主题中仍保持亮色样式 */
+.light-element {
+  --local-body-color: var(--light-body-color);
+  --local-card-color: var(--light-card-color);
+  --local-text-color: var(--light-text-color);
+  --local-text-color-secondary: var(--light-text-color-secondary);
+  --local-border-color: var(--light-border-color);
+  --local-divider-color: var(--light-divider-color);
+  --local-shadow-color: var(--light-shadow-color);
+  --local-background-color: var(--light-background-color);
+  --local-hover-color: var(--light-hover-color);
+  --local-active-color: var(--light-active-color);
+}
+
+/* 强制暗色元素 - 在亮色主题中仍保持暗色样式 */
+.dark-element {
+  --local-body-color: var(--dark-body-color);
+  --local-card-color: var(--dark-card-color);
+  --local-text-color: var(--dark-text-color);
+  --local-text-color-secondary: var(--dark-text-color-secondary);
+  --local-border-color: var(--dark-border-color);
+  --local-divider-color: var(--dark-divider-color);
+  --local-shadow-color: var(--dark-shadow-color);
+  --local-background-color: var(--dark-background-color);
+  --local-hover-color: var(--dark-hover-color);
+  --local-active-color: var(--dark-active-color);
+}
+
+/* 支持自适应暗色模式 */
+@media (prefers-color-scheme: dark) {
+  :root.auto-dark {
+    --body-color: var(--dark-body-color);
+    --card-color: var(--dark-card-color);
+    --text-color: var(--dark-text-color);
+    --text-color-secondary: var(--dark-text-color-secondary);
+    --border-color: var(--dark-border-color);
+    --divider-color: var(--dark-divider-color);
+    --shadow-color: var(--dark-shadow-color);
+    --background-color: var(--dark-background-color);
+    --hover-color: var(--dark-hover-color);
+    --active-color: var(--dark-active-color);
+  }
+}
+
+/* 动画相关 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-duration) var(--transition-timing);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition:
+    transform var(--transition-duration) var(--transition-timing),
+    opacity var(--transition-duration) var(--transition-timing);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(10px);
+  opacity: 0;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition:
+    transform var(--transition-duration) var(--transition-timing),
+    opacity var(--transition-duration) var(--transition-timing);
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  transform: translateY(-10px);
+  opacity: 0;
+}
+
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition:
+    transform var(--transition-duration) var(--transition-timing),
+    opacity var(--transition-duration) var(--transition-timing);
+}
+
+.slide-right-enter-from,
+.slide-right-leave-to {
+  transform: translateX(-10px);
+  opacity: 0;
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition:
+    transform var(--transition-duration) var(--transition-timing),
+    opacity var(--transition-duration) var(--transition-timing);
+}
+
+.slide-left-enter-from,
+.slide-left-leave-to {
+  transform: translateX(10px);
+  opacity: 0;
+}
+
+/* 缩放动画 */
+.zoom-enter-active,
+.zoom-leave-active {
+  transition:
+    transform var(--transition-duration) var(--transition-timing),
+    opacity var(--transition-duration) var(--transition-timing);
+}
+
+.zoom-enter-from,
+.zoom-leave-to {
+  transform: scale(0.95);
+  opacity: 0;
+}

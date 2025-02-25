@@ -11,6 +11,7 @@ import {
 } from '@vicons/ionicons5'
 import { NButton, NIcon, NAvatar } from 'naive-ui'
 import avatar from '@/assets/logo.png'
+import CheckUpdateButton from '../update/CheckUpdateButton.vue'
 
 const props = defineProps({
   isDark: {
@@ -67,6 +68,7 @@ onMounted(() => {
         <div class="app-title" data-tauri-drag-region>GameMod Master</div>
       </div>
       <div class="header-right">
+        <CheckUpdateButton class="update-button" />
         <n-button text circle @click="toggleTheme" class="action-btn">
           <template #icon>
             <n-icon :color="isDark ? '#fff' : '#333'">
@@ -204,6 +206,10 @@ onMounted(() => {
 }
 
 .action-btn {
+  margin-right: 8px;
+}
+
+.update-button {
   margin-right: 8px;
 }
 

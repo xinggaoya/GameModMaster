@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
-import type { Trainer } from '../types'
 import {
   NCard,
   NInput,
@@ -23,11 +22,19 @@ import {
   NTooltip,
 } from 'naive-ui'
 
+// 导入自定义组件
+import TrainerCard from '@/components/common/TrainerCard.vue'
+import TrainerSkeleton from '@/components/common/TrainerSkeleton.vue'
+import StateDisplay from '@/components/common/StateDisplay.vue'
+
 const router = useRouter()
 const store = useTrainerStore()
 
 const searchQuery = ref('')
 const totalPages = computed(() => store.totalPages)
+
+// 计算错误信息，确保返回字符串
+const errorMessage = computed(() => store.error || '')
 
 const handleSearch = () => {
   store.currentPage = 1 // 搜索时重置页码
@@ -40,8 +47,12 @@ const handlePageChange = async (page: number) => {
     await store.fetchTrainers(page)
     window.scrollTo({ top: 0, behavior: 'smooth' }) // 滚动到顶部
   } catch (error) {
-    window.$message?.error('获取数据失败')
+    // 错误处理由store处理
   }
+}
+
+const handleRetry = async () => {
+  await store.fetchTrainers(store.currentPage)
 }
 
 onMounted(async () => {
@@ -74,81 +85,41 @@ onMounted(async () => {
 
     <!-- 内容区域 -->
     <div class="content-section">
-      <NSpin :show="store.isLoading">
-        <div v-if="store.error" class="error-message">
-          {{ store.error }}
-        </div>
-        <NEmpty
-          v-else-if="!store.trainers.length"
-          description="暂无修改器数据"
-          class="empty-state"
-        />
-        <template v-else>
+      <StateDisplay
+        :loading="store.isLoading"
+        :error="errorMessage"
+        :empty="!store.trainers.length"
+        empty-text="暂无修改器数据"
+        @retry="handleRetry"
+      >
+        <!-- 加载中状态的自定义显示 -->
+        <template #loading>
           <NGrid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
-            <NGridItem v-for="trainer in store.trainers" :key="trainer.id">
-              <NCard
-                class="trainer-card"
-                hoverable
-                @click="router.push({ name: 'detail', params: { id: trainer.id } })"
-              >
-                <template #cover>
-                  <div class="image-container">
-                    <NImage
-                      :src="trainer.thumbnail"
-                      :alt="trainer.name"
-                      class="trainer-image"
-                      :preview-disabled="true"
-                      fallback-src="/placeholder.png"
-                      object-fit="cover"
-                    />
-                    <div class="image-overlay">
-                      <NButton quaternary circle class="detail-button">
-                        <template #icon>
-                          <NIcon><Search /></NIcon>
-                        </template>
-                      </NButton>
-                    </div>
-                  </div>
-                </template>
-
-                <div class="card-content">
-                  <div class="trainer-header">
-                    <NEllipsis :line-clamp="1" class="trainer-name">
-                      {{ trainer.name }}
-                    </NEllipsis>
-                    <NTag size="small" :bordered="false" type="success">
-                      {{ trainer.version }}
-                    </NTag>
-                  </div>
-
-                  <div class="trainer-info">
-                    <NTooltip trigger="hover">
-                      <template #trigger>
-                        <NText depth="3" class="game-version">
-                          支持游戏版本: {{ trainer.game_version }}
-                        </NText>
-                      </template>
-                      {{ trainer.game_version }}
-                    </NTooltip>
-                    <NText depth="3" class="update-time">
-                      更新于: {{ new Date(trainer.last_update).toLocaleDateString() }}
-                    </NText>
-                  </div>
-                </div>
-              </NCard>
+            <NGridItem v-for="i in 9" :key="i">
+              <TrainerSkeleton type="card" />
             </NGridItem>
           </NGrid>
-
-          <!-- 分页 -->
-          <div class="pagination-container">
-            <NPagination
-              v-model:page="store.currentPage"
-              :page-count="totalPages"
-              :on-update:page="handlePageChange"
-            />
-          </div>
         </template>
-      </NSpin>
+
+        <!-- 正常数据展示 -->
+        <NGrid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
+          <NGridItem v-for="trainer in store.trainers" :key="trainer.id">
+            <TrainerCard
+              :trainer="trainer"
+              @click="router.push({ name: 'detail', params: { id: trainer.id } })"
+            />
+          </NGridItem>
+        </NGrid>
+
+        <!-- 分页 -->
+        <div class="pagination-container">
+          <NPagination
+            v-model:page="store.currentPage"
+            :page-count="totalPages"
+            :on-update:page="handlePageChange"
+          />
+        </div>
+      </StateDisplay>
     </div>
   </div>
 </template>

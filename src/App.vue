@@ -6,6 +6,14 @@ import { Home, Download, InformationCircle } from '@vicons/ionicons5'
 import type { Component } from 'vue'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 import WindowLayout from '@/components/layouts/WindowLayout.vue'
+import {
+  checkForUpdates,
+  hasUpdate,
+  updateInfo,
+  initUpdateListener,
+  getAppVersion,
+} from './services/updaterService'
+import UpdateDialog from './components/update/UpdateDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -36,12 +44,41 @@ const handleTabChange = (name: string) => {
   router.push(name)
 }
 
+// 用于更新对话框
+const showUpdateDialog = ref(false)
+const currentVersion = ref('')
+
 onMounted(() => {
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme) {
     isDark.value = savedTheme === 'dark'
   }
+
+  // 初始化更新检查
+  initUpdateCheck()
 })
+
+// 初始化更新检查的函数
+const initUpdateCheck = async () => {
+  try {
+    // 初始化更新监听器
+    await initUpdateListener()
+
+    // 获取当前版本
+    currentVersion.value = await getAppVersion()
+
+    // 自动检查更新（延迟5秒，避免影响应用启动）
+    setTimeout(async () => {
+      console.log('自动检查更新...')
+      const result = await checkForUpdates()
+      if (result?.has_update) {
+        showUpdateDialog.value = true
+      }
+    }, 5000)
+  } catch (error) {
+    console.error('自动检查更新失败:', error)
+  }
+}
 </script>
 
 <template>
@@ -89,6 +126,9 @@ onMounted(() => {
       </n-notification-provider>
     </n-message-provider>
   </n-config-provider>
+
+  <!-- 更新对话框 -->
+  <UpdateDialog v-model:show="showUpdateDialog" :current-version="currentVersion" />
 </template>
 
 <style>

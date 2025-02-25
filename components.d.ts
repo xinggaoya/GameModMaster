@@ -7,6 +7,8 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    ActionButton: typeof import('./src/components/common/ActionButton.vue')['default']
+    CheckUpdateButton: typeof import('./src/components/update/CheckUpdateButton.vue')['default']
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
     IconCommunity: typeof import('./src/components/icons/IconCommunity.vue')['default']
     IconDocumentation: typeof import('./src/components/icons/IconDocumentation.vue')['default']
@@ -27,8 +29,12 @@ declare module 'vue' {
     NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    StateDisplay: typeof import('./src/components/common/StateDisplay.vue')['default']
     TheWelcome: typeof import('./src/components/TheWelcome.vue')['default']
     TitleBar: typeof import('./src/components/TitleBar.vue')['default']
+    TrainerCard: typeof import('./src/components/common/TrainerCard.vue')['default']
+    TrainerSkeleton: typeof import('./src/components/common/TrainerSkeleton.vue')['default']
+    UpdateDialog: typeof import('./src/components/update/UpdateDialog.vue')['default']
     WelcomeItem: typeof import('./src/components/WelcomeItem.vue')['default']
     WindowLayout: typeof import('./src/components/layouts/WindowLayout.vue')['default']
   }

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import type { MessageApi } from 'naive-ui'
 import type { Trainer, InstalledTrainer } from '../types'
+import { handleError } from '../utils/errorHandler'
 
 // 本地存储键名
 const STORAGE_KEY = {
@@ -71,6 +72,7 @@ export const useTrainerStore = defineStore('trainer', () => {
     } catch (err) {
       console.error('Store: 初始化失败:', err)
       error.value = err instanceof Error ? err.message : '加载数据失败'
+      handleError(err, window.$message)
     } finally {
       isLoading.value = false
       console.log('Store: 加载状态已重置')
@@ -181,144 +183,114 @@ export const useTrainerStore = defineStore('trainer', () => {
     error.value = null
   }
 
-  const fetchTrainers = async (page: number = 1) => {
-    console.log('Store: 开始获取修改器列表', { page })
-    isLoading.value = true
+  // 获取修改器列表
+  async function fetchTrainers(page: number) {
     try {
-      const result = await invoke<{ trainers: Trainer[]; total: number }>('fetch_trainers', {
-        page,
-      })
-      console.log('Store: 获取修改器列表成功', { count: result?.trainers?.length })
+      isLoading.value = true
+      error.value = null
 
-      if (result && Array.isArray(result.trainers)) {
-        trainers.value = result.trainers
-        currentPage.value = page
-        // 计算总页数
-        totalPages.value = Math.ceil(result.total / 12) // 每页固定12条
-      } else {
-        throw new Error('返回数据格式错误')
-      }
+      const response = await invoke<{
+        trainers: Trainer[]
+        total: number
+      }>('fetch_trainers', { page })
+
+      trainers.value = response.trainers
+      // 估算总页数（假设每页20条记录）
+      totalPages.value = Math.ceil(response.total / 20)
+
+      return response.trainers
     } catch (err) {
-      console.error('Store: 获取修改器列表失败:', err)
       error.value = err instanceof Error ? err.message : '获取修改器列表失败'
-      window.$message?.error('获取修改器列表失败')
-      throw err
+      handleError(err, window.$message)
+      return []
     } finally {
       isLoading.value = false
     }
   }
 
-  const searchTrainers = async (query: string) => {
-    isLoading.value = true
+  // 搜索修改器
+  async function searchTrainers(query: string, page = 1) {
     try {
+      if (!query.trim()) {
+        return fetchTrainers(page)
+      }
+
+      isLoading.value = true
+      error.value = null
       searchQuery.value = query
-      currentPage.value = 1 // 重置页码
-      const result = await invoke<{ trainers: Trainer[]; total: number }>('search_trainers', {
-        query,
-        page: currentPage.value,
-      })
 
-      if (result) {
-        trainers.value = result.trainers
-        totalPages.value = Math.ceil(result.total / 12) // 每页固定12条
-      }
-    } catch (error) {
-      console.error('Failed to search trainers:', error)
-      window.$message?.error('搜索修改器失败')
+      const response = await invoke<{
+        trainers: Trainer[]
+        total: number
+      }>('search_trainers', { query, page })
+
+      trainers.value = response.trainers
+      totalPages.value = Math.ceil(response.total / 20)
+
+      return response.trainers
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '搜索修改器失败'
+      handleError(err, window.$message)
+      return []
     } finally {
       isLoading.value = false
     }
   }
 
-  const getTrainerDetail = async (id: string): Promise<Trainer | null> => {
+  // 获取修改器详情
+  async function getTrainerDetail(id: string) {
     try {
-      return await invoke<Trainer>('get_trainer_detail', { id })
-    } catch (error) {
-      console.error('Failed to get trainer detail:', error)
-      window.$message.error('获取修改器详情失败')
-      return null
+      const result = await invoke<Trainer>('get_trainer_detail', { id })
+      return result
+    } catch (err) {
+      handleError(err, window.$message)
+      throw err // 允许调用者处理错误
     }
   }
 
-  const downloadTrainer = async (trainer: Trainer) => {
+  // 下载修改器
+  async function downloadTrainer(trainer: Trainer) {
     try {
-      console.log('开始下载修改器:', trainer)
-      const downloadPath = await invoke<string>('download_trainer', { trainer })
-      console.log('下载结果:', downloadPath)
+      const result = await invoke<string>('download_trainer', { trainer })
 
-      // 添加安装信息
-      const trainerWithMeta: InstalledTrainer = {
-        ...trainer,
-        installed_path: downloadPath,
-        install_time: new Date().toISOString(),
-        last_launch_time: null,
-      }
-
-      // 添加到已下载列表
-      const downloadExists = downloadedTrainers.value.some((t) => t.id === trainer.id)
-      if (!downloadExists) {
+      // 添加到下载记录
+      const exists = downloadedTrainers.value.some((t) => t.id === trainer.id)
+      if (!exists) {
         downloadedTrainers.value.push(trainer)
-        // 保存到本地存储
         saveToStorage.downloaded(downloadedTrainers.value)
       }
 
-      // 添加到已安装列表
-      const installExists = installedTrainers.value.some((t) => t.id === trainer.id)
-      if (!installExists) {
-        installedTrainers.value.push(trainerWithMeta)
-        // 保存到本地存储
-        saveToStorage.installed(installedTrainers.value)
-      }
-
-      if (window.$message) {
-        window.$message.success('下载成功')
-      }
-    } catch (error) {
-      console.error('下载失败:', error)
-      if (window.$message) {
-        window.$message.error(`下载失败: ${error instanceof Error ? error.message : String(error)}`)
-      }
-      throw new Error(error instanceof Error ? error.message : String(error))
+      return result
+    } catch (err) {
+      handleError(err, window.$message)
+      throw err
     }
   }
 
-  const deleteTrainer = async (trainerId: string) => {
+  // 删除修改器
+  async function deleteTrainer(trainerId: string) {
     try {
       await invoke('delete_trainer', { trainerId })
-      // 从已下载列表中移除
+
+      // 从下载记录中删除
       downloadedTrainers.value = downloadedTrainers.value.filter((t) => t.id !== trainerId)
       saveToStorage.downloaded(downloadedTrainers.value)
 
-      // 从已安装列表中移除
-      installedTrainers.value = installedTrainers.value.filter((t) => t.id !== trainerId)
-      saveToStorage.installed(installedTrainers.value)
-
-      window.$message.success('删除成功')
-    } catch (error) {
-      console.error('Failed to delete trainer:', error)
-      window.$message.error('删除失败')
-      throw error
+      return true
+    } catch (err) {
+      handleError(err, window.$message)
+      throw err
     }
   }
 
-  const launchTrainer = async (trainerId: string) => {
+  // 启动修改器
+  async function launchTrainer(trainerId: string) {
     try {
       await invoke('launch_trainer', { trainerId })
-      // 更新最后启动时间
-      const index = installedTrainers.value.findIndex((t) => t.id === trainerId)
-      if (index !== -1) {
-        installedTrainers.value[index] = {
-          ...installedTrainers.value[index],
-          last_launch_time: new Date().toISOString(),
-        }
-        // 更新本地存储
-        saveToStorage.installed(installedTrainers.value)
-      }
-      window.$message.success('启动成功')
-    } catch (error) {
-      console.error('Failed to launch trainer:', error)
-      window.$message.error('启动失败')
-      throw error
+      return true
+    } catch (err) {
+      handleError(err, window.$message)
+      throw err
     }
   }
 

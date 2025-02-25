@@ -1,5 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "identifier": "com.gamemodmaster.dev",
+  "productName": "GameMod Master",
+  "version": "1.0.5",
   "build": {
     "beforeBuildCommand": "pnpm build",
     "beforeDevCommand": "pnpm dev",
@@ -35,8 +38,5 @@
       "icons/icon.ico"
     ],
     "targets": "all"
-  },
-  "identifier": "com.gamemodmaster.dev",
-  "productName": "GameMod Master",
-  "version": "1.0.4"
+  }
 }

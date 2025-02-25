@@ -1,10 +1,42 @@
 :root {
-  /* 基础颜色变量 */
-  --primary-color: #18a058;
-  --primary-color-hover: #36ad6a;
-  --primary-color-pressed: #0c7a43;
-  --primary-color-light: rgba(24, 160, 88, 0.1);
+  /* 主色调 */
+  --primary: #6366f1;
+  --primary-hover: #818cf8;
+  --primary-pressed: #4f46e5;
+  --primary-suppl: #4338ca;
 
+  /* 亮色主题变量 */
+  --body-color: #f5f7fa;
+  --card-color: #ffffff;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --divider-color: #e5e7eb;
+  --hover-color: #f3f4f6;
+
+  /* 阴影效果 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* 动画 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* 基础颜色变量 */
   --success-color: #18a058;
   --warning-color: #f0a020;
   --error-color: #d03050;
@@ -38,18 +70,6 @@
   --transition-duration: 0.3s;
   --transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* 默认使用亮色主题 */
-  --body-color: var(--light-body-color);
-  --card-color: var(--light-card-color);
-  --text-color: var(--light-text-color);
-  --text-color-secondary: var(--light-text-color-secondary);
-  --border-color: var(--light-border-color);
-  --divider-color: var(--light-divider-color);
-  --shadow-color: var(--light-shadow-color);
-  --background-color: var(--light-background-color);
-  --hover-color: var(--light-hover-color);
-  --active-color: var(--light-active-color);
-
   /* 尺寸变量 */
   --header-height: 64px;
   --footer-height: 48px;
@@ -57,22 +77,6 @@
   --border-radius-small: 4px;
   --border-radius-medium: 8px;
   --border-radius-large: 12px;
-
-  /* 间距变量 */
-  --spacing-mini: 4px;
-  --spacing-small: 8px;
-  --spacing-base: 16px;
-  --spacing-large: 24px;
-  --spacing-xl: 32px;
-  --spacing-xxl: 48px;
-
-  /* 字体大小变量 */
-  --font-size-mini: 12px;
-  --font-size-small: 14px;
-  --font-size-base: 16px;
-  --font-size-large: 18px;
-  --font-size-xl: 20px;
-  --font-size-xxl: 24px;
 
   /* Z-index层级变量 */
   --z-index-dropdown: 100;
@@ -84,18 +88,15 @@
   --z-index-tooltip: 700;
 }
 
-/* 暗色主题类 */
+/* 暗色主题变量 */
 .dark-theme {
-  --body-color: var(--dark-body-color);
-  --card-color: var(--dark-card-color);
-  --text-color: var(--dark-text-color);
-  --text-color-secondary: var(--dark-text-color-secondary);
-  --border-color: var(--dark-border-color);
-  --divider-color: var(--dark-divider-color);
-  --shadow-color: var(--dark-shadow-color);
-  --background-color: var(--dark-background-color);
-  --hover-color: var(--dark-hover-color);
-  --active-color: var(--dark-active-color);
+  --body-color: #0f172a;
+  --card-color: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --divider-color: #334155;
+  --hover-color: #1e293b;
 }
 
 /* 强制亮色元素 - 在暗色主题中仍保持亮色样式 */
@@ -217,4 +218,80 @@
 .zoom-leave-to {
   transform: scale(0.95);
   opacity: 0;
+}
+
+/* 全局滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* 渐变背景效果 */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-suppl));
+}
+
+/* 游戏风格标题 */
+.game-title {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background-image: linear-gradient(135deg, var(--primary), var(--primary-suppl));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 卡片悬停效果 */
+.hover-card {
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+.hover-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade {
+  animation: fadeIn var(--transition-normal);
+}
+
+.animate-slide-up {
+  animation: slideUp var(--transition-normal);
 }

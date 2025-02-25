@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search } from '@vicons/ionicons5'
+import {
+  Search,
+  GameControllerOutline,
+  DownloadOutline,
+  StatsChartOutline,
+  PeopleOutline,
+} from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
 import {
   NCard,
@@ -13,28 +19,96 @@ import {
   NGridItem,
   NSpace,
   NText,
-  NImage,
   NEmpty,
-  NEllipsis,
   NSpin,
   NPagination,
-  NTag,
-  NTooltip,
 } from 'naive-ui'
 
 // 导入自定义组件
-import TrainerCard from '@/components/common/TrainerCard.vue'
-import TrainerSkeleton from '@/components/common/TrainerSkeleton.vue'
-import StateDisplay from '@/components/common/StateDisplay.vue'
+import GameCard from '@/components/common/GameCard.vue'
+import StatusCard from '@/components/common/StatusCard.vue'
 
 const router = useRouter()
 const store = useTrainerStore()
 
 const searchQuery = ref('')
+const isLoading = computed(() => store.isLoading)
 const totalPages = computed(() => store.totalPages)
+const trainers = computed(() => store.trainers)
 
 // 计算错误信息，确保返回字符串
 const errorMessage = computed(() => store.error || '')
+
+// 本地数据统计
+const statistics = computed(() => [
+  {
+    title: '已下载修改器',
+    value: store.downloadedTrainers.length,
+    icon: DownloadOutline,
+    color: '#6366f1',
+  },
+  {
+    title: '已安装修改器',
+    value: store.installedTrainers.length,
+    icon: GameControllerOutline,
+    color: '#2dd4bf',
+  },
+  {
+    title: '最近使用',
+    value: getLastUsedGame(),
+    icon: PeopleOutline,
+    color: '#f43f5e',
+  },
+  {
+    title: '上次使用时间',
+    value: getLastUsedTime(),
+    icon: StatsChartOutline,
+    color: '#f59e0b',
+  },
+])
+
+// 获取最后使用的游戏名称
+function getLastUsedGame() {
+  const trainers = [...store.downloadedTrainers]
+  if (trainers.length === 0) return '无'
+
+  trainers.sort((a, b) => {
+    const timeA = a.last_launch_time ? new Date(a.last_launch_time).getTime() : 0
+    const timeB = b.last_launch_time ? new Date(b.last_launch_time).getTime() : 0
+    return timeB - timeA
+  })
+
+  return trainers[0]?.name || '无'
+}
+
+// 获取上次使用时间
+function getLastUsedTime() {
+  const trainers = [...store.downloadedTrainers]
+  if (trainers.length === 0) return '无使用记录'
+
+  trainers.sort((a, b) => {
+    const timeA = a.last_launch_time ? new Date(a.last_launch_time).getTime() : 0
+    const timeB = b.last_launch_time ? new Date(b.last_launch_time).getTime() : 0
+    return timeB - timeA
+  })
+
+  if (!trainers[0]?.last_launch_time) return '无使用记录'
+
+  return formatDate(trainers[0].last_launch_time)
+}
+
+// 格式化日期
+const formatDate = (dateString: string | undefined | null) => {
+  if (!dateString) return '未知'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 const handleSearch = () => {
   store.currentPage = 1 // 搜索时重置页码
@@ -51,230 +125,217 @@ const handlePageChange = async (page: number) => {
   }
 }
 
-const handleRetry = async () => {
-  await store.fetchTrainers(store.currentPage)
+// 格式化数字，添加千位分隔符
+const formatNumber = (num: number): string => {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
 onMounted(async () => {
-  await store.initialize()
+  if (trainers.value.length === 0) {
+    await store.fetchTrainers(1)
+  }
 })
 </script>
 
 <template>
-  <div class="home-container">
-    <!-- 搜索区域 -->
-    <div class="search-section">
-      <NCard content-style="padding: 0;">
-        <NInputGroup>
-          <NInput
-            v-model:value="searchQuery"
-            placeholder="搜索游戏修改器..."
-            @keydown.enter="handleSearch"
-            clearable
-          >
-            <template #prefix>
-              <NIcon><Search /></NIcon>
-            </template>
-          </NInput>
-          <n-button type="primary" @click="handleSearch" :loading="store.isLoading" ghost>
-            搜索
-          </n-button>
-        </NInputGroup>
-      </NCard>
+  <div class="home-view animate-fade">
+    <!-- 欢迎区域 -->
+    <section class="welcome-section">
+      <div class="welcome-content">
+        <h1 class="welcome-title">
+          <span class="game-title">Game Mod Master</span>
+        </h1>
+        <p class="welcome-subtitle">一站式游戏修改器管理平台</p>
+
+        <!-- 搜索框 -->
+        <div class="search-container">
+          <NInputGroup>
+            <NInput
+              v-model:value="searchQuery"
+              placeholder="搜索游戏修改器..."
+              clearable
+              @keydown.enter="handleSearch"
+            />
+            <NButton type="primary" ghost @click="handleSearch">
+              <template #icon>
+                <NIcon><Search /></NIcon>
+              </template>
+              搜索
+            </NButton>
+          </NInputGroup>
+        </div>
+      </div>
+    </section>
+
+    <!-- 统计卡片 -->
+    <section class="stats-section">
+      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="16" :y-gap="16">
+        <NGridItem v-for="(stat, index) in statistics" :key="index">
+          <StatusCard
+            :title="stat.title"
+            :value="typeof stat.value === 'number' ? formatNumber(stat.value) : stat.value"
+            :icon="stat.icon"
+            :color="stat.color"
+            :loading="isLoading"
+          />
+        </NGridItem>
+      </NGrid>
+    </section>
+
+    <!-- 修改器部分标题 -->
+    <section class="trainers-section">
+      <h2 class="section-title">热门修改器</h2>
+    </section>
+
+    <!-- 错误显示 -->
+    <NCard v-if="errorMessage" class="error-card">
+      <NText type="error">{{ errorMessage }}</NText>
+    </NCard>
+
+    <!-- 加载状态 -->
+    <div v-else-if="isLoading" class="loading-container">
+      <NSpin size="large" />
     </div>
 
-    <!-- 内容区域 -->
-    <div class="content-section">
-      <StateDisplay
-        :loading="store.isLoading"
-        :error="errorMessage"
-        :empty="!store.trainers.length"
-        empty-text="暂无修改器数据"
-        @retry="handleRetry"
-      >
-        <!-- 加载中状态的自定义显示 -->
-        <template #loading>
-          <NGrid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
-            <NGridItem v-for="i in 9" :key="i">
-              <TrainerSkeleton type="card" />
-            </NGridItem>
-          </NGrid>
-        </template>
+    <!-- 空状态 -->
+    <NEmpty v-else-if="trainers.length === 0" description="没有找到任何修改器" class="empty-state">
+      <template #extra>
+        <NButton @click="store.fetchTrainers(1)">刷新</NButton>
+      </template>
+    </NEmpty>
 
-        <!-- 正常数据展示 -->
-        <NGrid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
-          <NGridItem v-for="trainer in store.trainers" :key="trainer.id">
-            <TrainerCard
-              :trainer="trainer"
-              @click="router.push({ name: 'detail', params: { id: trainer.id } })"
-            />
-          </NGridItem>
-        </NGrid>
+    <!-- 修改器网格 -->
+    <section v-else class="trainers-grid">
+      <NGrid cols="1 s:2 m:3 l:4" responsive="screen" :x-gap="16" :y-gap="24">
+        <NGridItem v-for="trainer in trainers" :key="trainer.id">
+          <GameCard :trainer="trainer" />
+        </NGridItem>
+      </NGrid>
+    </section>
 
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <NPagination
-            v-model:page="store.currentPage"
-            :page-count="totalPages"
-            :on-update:page="handlePageChange"
-          />
-        </div>
-      </StateDisplay>
+    <!-- 分页 -->
+    <div class="pagination-container" v-if="totalPages > 1">
+      <NPagination
+        v-model:page="store.currentPage"
+        :page-count="totalPages"
+        :page-sizes="[12, 24, 36]"
+        show-size-picker
+        @update:page="handlePageChange"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
-.home-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  max-width: 1200px;
+.home-view {
+  width: 100%;
+}
+
+.welcome-section {
+  background: linear-gradient(120deg, var(--primary) 0%, var(--secondary-dark) 100%);
+  padding: 3rem 2rem;
+  border-radius: var(--radius-lg);
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/src/assets/wallhaven-p9pgjp.jpg');
+  background-size: cover;
+  opacity: 0.1;
+  z-index: 0;
+}
+
+.welcome-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 800px;
   margin: 0 auto;
 }
 
-.search-section {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  backdrop-filter: blur(10px);
+.welcome-title {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: white;
 }
 
-.content-section {
-  flex: 1;
+.welcome-subtitle {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.trainer-card {
-  height: 100%;
-  transition: all 0.3s ease;
-  cursor: pointer;
+.search-container {
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.trainer-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.stats-section {
+  margin-bottom: 2rem;
 }
 
-.image-container {
-  position: relative;
-  width: 100%;
-  padding-top: 56.25%; /* 16:9 比例 */
-  overflow: hidden;
-}
-
-.trainer-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.3s ease;
-}
-
-.image-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.trainer-card:hover .image-overlay {
-  opacity: 1;
-}
-
-.trainer-card:hover .trainer-image {
-  transform: scale(1.05);
-}
-
-.detail-button {
-  color: #fff !important;
-  background: rgba(255, 255, 255, 0.2) !important;
-  backdrop-filter: blur(4px);
-}
-
-.detail-button:hover {
-  background: rgba(255, 255, 255, 0.3) !important;
-}
-
-.card-content {
-  padding: 16px;
-}
-
-.trainer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.trainer-name {
-  font-size: 1.1em;
-  font-weight: 600;
-  flex: 1;
-  min-width: 0;
-}
-
-.trainer-info {
+.trainers-section {
+  margin-bottom: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1rem;
 }
 
-.game-version,
-.update-time {
-  font-size: 0.9em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.trainers-grid {
+  margin-bottom: 2rem;
+}
+
+.error-card {
+  margin-bottom: 2rem;
+}
+
+.loading-container,
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  margin-bottom: 2rem;
 }
 
 .pagination-container {
-  margin-top: 24px;
   display: flex;
   justify-content: center;
+  margin: 2rem 0;
 }
 
-.error-message {
-  text-align: center;
-  color: var(--error-color);
-  padding: 20px;
-}
-
-.empty-state {
-  padding: 40px;
-  text-align: center;
-}
-
-/* 响应式布局 */
-@media (max-width: 1200px) {
-  :deep(.n-grid) {
-    --cols: 2 !important;
-  }
-}
-
+/* 响应式调整 */
 @media (max-width: 768px) {
-  :deep(.n-grid) {
-    --cols: 1 !important;
+  .welcome-section {
+    padding: 2rem 1rem;
   }
 
-  .home-container {
-    gap: 16px;
+  .welcome-title {
+    font-size: 2rem;
   }
 
-  .search-section {
-    padding: 8px 0;
+  .welcome-subtitle {
+    font-size: 1rem;
   }
 
-  .card-content {
-    padding: 12px;
+  .section-title {
+    font-size: 1.25rem;
   }
 }
 </style>

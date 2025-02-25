@@ -85,45 +85,47 @@ const initUpdateCheck = async () => {
   <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
     <n-global-style />
     <n-message-provider>
-      <n-notification-provider>
-        <n-loading-bar-provider>
-          <n-dialog-provider>
-            <window-layout v-model:isDark="isDark">
-              <n-card class="app-main" content-style="padding: 0;">
-                <NTabs
-                  v-model:value="activeTab"
-                  type="line"
-                  animated
-                  class="nav-tabs"
-                  @update:value="handleTabChange"
-                >
-                  <NTab
-                    v-for="tab in tabs"
-                    :key="tab.name"
-                    :name="tab.name"
-                    :tab="
-                      () =>
-                        h('div', { class: 'tab-content' }, [
-                          h(NIcon, null, { default: () => h(tab.icon) }),
-                          h('span', { class: 'tab-label' }, tab.label),
-                        ])
-                    "
-                  />
-                </NTabs>
-                <div style="height: calc(100vh - 87px)">
-                  <n-scrollbar class="app-content" trigger="none">
-                    <router-view v-slot="{ Component }">
-                      <transition name="fade" mode="out-in">
-                        <component :is="Component" />
-                      </transition>
-                    </router-view>
-                  </n-scrollbar>
-                </div>
-              </n-card>
-            </window-layout>
-          </n-dialog-provider>
-        </n-loading-bar-provider>
-      </n-notification-provider>
+      <n-modal-provider>
+        <n-notification-provider>
+          <n-loading-bar-provider>
+            <n-dialog-provider>
+              <window-layout v-model:isDark="isDark">
+                <n-card class="app-main" content-style="padding: 0;">
+                  <NTabs
+                    v-model:value="activeTab"
+                    type="line"
+                    animated
+                    class="nav-tabs"
+                    @update:value="handleTabChange"
+                  >
+                    <NTab
+                      v-for="tab in tabs"
+                      :key="tab.name"
+                      :name="tab.name"
+                      :tab="
+                        () =>
+                          h('div', { class: 'tab-content' }, [
+                            h(NIcon, null, { default: () => h(tab.icon) }),
+                            h('span', { class: 'tab-label' }, tab.label),
+                          ])
+                      "
+                    />
+                  </NTabs>
+                  <div style="height: calc(100vh - 87px)">
+                    <n-scrollbar class="app-content" trigger="none">
+                      <router-view v-slot="{ Component }">
+                        <transition name="fade" mode="out-in">
+                          <component :is="Component" />
+                        </transition>
+                      </router-view>
+                    </n-scrollbar>
+                  </div>
+                </n-card>
+              </window-layout>
+            </n-dialog-provider>
+          </n-loading-bar-provider>
+        </n-notification-provider>
+      </n-modal-provider>
     </n-message-provider>
   </n-config-provider>
 

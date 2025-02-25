@@ -97,7 +97,8 @@ import {
 } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
 import GameCard from '@/components/common/GameCard.vue'
-import type { Trainer } from '../types'
+import type { Trainer } from '@/types'
+import { NAvatar, NButton, NIcon, NSpace, NTag } from 'naive-ui'
 
 const router = useRouter()
 const store = useTrainerStore()

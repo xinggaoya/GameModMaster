@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, h, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { darkTheme, NConfigProvider, NTabs, NTab, NIcon, NScrollbar } from 'naive-ui'
 import { Home, Download, InformationCircle } from '@vicons/ionicons5'
 import type { Component } from 'vue'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 import WindowLayout from '@/components/layouts/WindowLayout.vue'
+import UpdateDialog from './components/update/UpdateDialog.vue'
 import {
   checkForUpdates,
   hasUpdate,
@@ -13,11 +14,10 @@ import {
   initUpdateListener,
   getAppVersion,
 } from './services/updaterService'
-import UpdateDialog from './components/update/UpdateDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
-const isDark = ref(true)
+const isDark = ref(false)
 
 // 根据isDark的值返回主题
 const theme = computed(() => (isDark.value ? darkTheme : null))

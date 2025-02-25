@@ -27,7 +27,7 @@ const route = useRoute()
 
 // 侧边栏折叠状态
 const collapsed = ref(false)
-const isDark = ref(true)
+const isDark = ref(false) // 默认关闭暗黑模式
 
 // 标签页配置
 const tabs = [

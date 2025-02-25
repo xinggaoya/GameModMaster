@@ -1,9 +1,9 @@
 {
   "common": {
-    "primaryColor": "#3366FF",
-    "primaryColorHover": "#5A7EFF",
-    "primaryColorPressed": "#1A4BFF",
-    "primaryColorSuppl": "#1A4BFF",
+    "primaryColor": "#6366F1",
+    "primaryColorHover": "#818CF8",
+    "primaryColorPressed": "#4F46E5",
+    "primaryColorSuppl": "#4338CA",
     "infoColor": "#909399",
     "infoColorHover": "#A6A9AD",
     "infoColorPressed": "#7B7E83",
@@ -20,6 +20,32 @@
     "errorColorHover": "#F76560",
     "errorColorPressed": "#CB2A2A",
     "errorColorSuppl": "#CB2A2A",
+    "borderRadius": "8px"
+  },
+  "Card": {
+    "borderRadius": "12px",
+    "boxShadow": "0 4px 20px 0 rgba(0, 0, 0, 0.08)"
+  },
+  "Button": {
+    "borderRadiusSmall": "6px",
+    "borderRadiusMedium": "8px",
+    "borderRadiusLarge": "10px",
+    "textColorPrimary": "#fff",
+    "textColorHoverPrimary": "#fff"
+  },
+  "Input": {
+    "borderRadius": "8px"
+  },
+  "Tag": {
     "borderRadius": "6px"
+  },
+  "Avatar": {
+    "borderRadius": "12px"
+  },
+  "Tabs": {
+    "tabFontWeightActive": "600"
+  },
+  "Dialog": {
+    "borderRadius": "16px"
   }
 }

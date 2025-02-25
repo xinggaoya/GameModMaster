@@ -114,7 +114,7 @@ export async function downloadAndInstallUpdate(downloadUrl: string): Promise<voi
     }
 
     // 开始下载和安装
-    await invoke('download_and_install_update', { download_url: downloadUrl })
+    await invoke('download_and_install_update', { downloadUrl })
   } catch (error) {
     console.error('下载安装更新失败:', error)
     updateProgress.value = {

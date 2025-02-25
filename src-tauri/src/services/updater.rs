@@ -131,40 +131,46 @@ pub async fn download_and_install_update(
         .content_length()
         .unwrap_or(0);
 
-    // 创建文件
-    let mut file = File::create(&download_path)
-        .map_err(|e| AppError::IoError(e))?;
-
-    let mut downloaded = 0u64;
-    let mut last_progress = 0u32;
-
-    // 分块下载文件
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|e| AppError::RequestError(e))?
+    // 创建文件（使用代码块限制作用域）
     {
-        file.write_all(&chunk)
+        let mut file = File::create(&download_path)
             .map_err(|e| AppError::IoError(e))?;
-        
-        downloaded += chunk.len() as u64;
-        
-        if total_size > 0 {
-            let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u32;
-            if progress > last_progress {
-                last_progress = progress;
-                window
-                    .emit(
-                        "update-progress",
-                        UpdateProgress {
-                            status: "downloading".to_string(),
-                            progress,
-                            message: format!("正在下载: {}%", progress),
-                        },
-                    )
-                    .ok(); // 忽略发送事件的错误
+
+        let mut downloaded = 0u64;
+        let mut last_progress = 0u32;
+
+        // 分块下载文件
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| AppError::RequestError(e))?
+        {
+            file.write_all(&chunk)
+                .map_err(|e| AppError::IoError(e))?;
+            
+            downloaded += chunk.len() as u64;
+            
+            if total_size > 0 {
+                let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u32;
+                if progress > last_progress {
+                    last_progress = progress;
+                    window
+                        .emit(
+                            "update-progress",
+                            UpdateProgress {
+                                status: "downloading".to_string(),
+                                progress,
+                                message: format!("正在下载: {}%", progress),
+                            },
+                        )
+                        .ok(); // 忽略发送事件的错误
+                }
             }
         }
+        
+        // 确保文件写入磁盘且句柄关闭
+        file.flush().map_err(|e| AppError::IoError(e))?;
+        // 文件在这里离开作用域，自动关闭
     }
 
     // 发送下载完成事件
@@ -178,6 +184,9 @@ pub async fn download_and_install_update(
             },
         )
         .map_err(|e| AppError::ExecutionError(format!("发送事件失败: {}", e)))?;
+
+    // 添加短暂延迟，确保文件操作完全完成
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     // Windows平台特定代码：启动安装程序
     #[cfg(target_os = "windows")]

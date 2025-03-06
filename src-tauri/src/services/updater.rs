@@ -1,11 +1,16 @@
 use crate::api::error::{AppError, AppResult};
-use crate::utils::path::get_app_dir;
+use log::info;
+use reqwest;
 use serde::{Deserialize, Serialize};
-use std::os::windows::process::CommandExt;
-use std::path::Path;
-use tauri::{Window, Emitter};
+use std::env;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
+use futures_util::StreamExt;
+use tauri::Window;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+use tauri::{Emitter};
 
 // 更新信息结构体
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -22,6 +27,20 @@ pub struct UpdateProgress {
     pub status: String,
     pub progress: u32,
     pub message: String,
+}
+
+// 发送进度更新的辅助函数
+fn send_progress_update(window: &Window, status: &str, progress: u32, message: &str) -> AppResult<()> {
+    window
+        .emit(
+            "update-progress",
+            UpdateProgress {
+                status: status.to_string(),
+                progress,
+                message: message.to_string(),
+            },
+        )
+        .map_err(|e| AppError::ExecutionError(format!("发送事件失败: {}", e)))
 }
 
 // 检查更新
@@ -102,108 +121,108 @@ pub async fn download_and_install_update(
     window: Window,
     download_url: String,
 ) -> AppResult<()> {
-    // 创建下载目录和文件路径
-    let app_dir = get_app_dir()?;
-    let download_path = Path::new(&app_dir).join("update.exe");
+    // 创建临时目录
+    let temp_dir = env::temp_dir().join("game_mod_master_update");
+    if temp_dir.exists() {
+        fs::remove_dir_all(&temp_dir)?;
+    }
+    fs::create_dir_all(&temp_dir)?;
 
-    // 发送开始下载事件
-    window
-        .emit(
-            "update-progress",
-            UpdateProgress {
-                status: "downloading".to_string(),
-                progress: 0,
-                message: "开始下载更新...".to_string(),
-            },
-        )
-        .map_err(|e| AppError::ExecutionError(format!("发送事件失败: {}", e)))?;
+    // 获取下载文件名
+    let file_name = download_url
+        .split('/')
+        .last()
+        .ok_or_else(|| AppError::ParseError("无法解析文件名".to_string()))?;
+    let target_path = temp_dir.join(file_name);
 
-    // 下载文件
+    // 发送开始下载通知
+    send_progress_update(&window, "downloading", 0, "正在准备下载...")?;
+
+    // 使用代理下载
     let client = reqwest::Client::new();
-    let mut response = client
-        .get(&download_url)
-        .send()
-        .await
-        .map_err(|e| AppError::RequestError(e))?;
+    
+    // 原始URL和代理URL
+    let original_url = download_url.clone();
+    let proxy_url = format!("https://gh-proxy.com/{}", original_url);
+    
+    info!("尝试通过代理下载: {}", proxy_url);
+    send_progress_update(&window, "downloading", 5, "尝试通过代理下载...")?;
+    
+    // 先尝试使用代理下载
+    let response_result = client.get(&proxy_url).send().await;
+    
+    // 如果代理下载失败，使用原始URL
+    let response = if let Ok(resp) = response_result {
+        if resp.status().is_success() {
+            info!("使用代理下载成功");
+            resp
+        } else {
+            info!("代理下载失败，尝试直接下载: {}", original_url);
+            send_progress_update(&window, "downloading", 5, "代理下载失败，尝试直接下载...")?;
+            client.get(&original_url).send().await?
+        }
+    } else {
+        info!("代理下载失败，尝试直接下载: {}", original_url);
+        send_progress_update(&window, "downloading", 5, "代理下载失败，尝试直接下载...")?;
+        client.get(&original_url).send().await?
+    };
 
     // 获取文件大小
     let total_size = response
         .content_length()
-        .unwrap_or(0);
+        .ok_or_else(|| AppError::DownloadError("无法获取文件大小".to_string()))?;
 
     // 创建文件（使用代码块限制作用域）
     {
-        let mut file = File::create(&download_path)
+        let mut file = File::create(&target_path)
             .map_err(|e| AppError::IoError(e))?;
 
-        let mut downloaded = 0u64;
-        let mut last_progress = 0u32;
+        let mut downloaded = 0;
+        let mut stream = response.bytes_stream();
 
-        // 分块下载文件
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|e| AppError::RequestError(e))?
-        {
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.map_err(|e| AppError::DownloadError(e.to_string()))?;
             file.write_all(&chunk)
                 .map_err(|e| AppError::IoError(e))?;
-            
+
             downloaded += chunk.len() as u64;
+            let progress = ((downloaded as f64 / total_size as f64) * 90.0) as u32 + 5; // 5-95%
             
-            if total_size > 0 {
-                let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u32;
-                if progress > last_progress {
-                    last_progress = progress;
-                    window
-                        .emit(
-                            "update-progress",
-                            UpdateProgress {
-                                status: "downloading".to_string(),
-                                progress,
-                                message: format!("正在下载: {}%", progress),
-                            },
-                        )
-                        .ok(); // 忽略发送事件的错误
-                }
-            }
+            // 发送下载进度
+            send_progress_update(
+                &window,
+                "downloading",
+                progress,
+                &format!("下载中... {}%", progress),
+            )?;
         }
-        
-        // 确保文件写入磁盘且句柄关闭
-        file.flush().map_err(|e| AppError::IoError(e))?;
-        // 文件在这里离开作用域，自动关闭
     }
 
-    // 发送下载完成事件
-    window
-        .emit(
-            "update-progress",
-            UpdateProgress {
-                status: "completed".to_string(),
-                progress: 100,
-                message: "下载完成，准备安装...".to_string(),
-            },
-        )
-        .map_err(|e| AppError::ExecutionError(format!("发送事件失败: {}", e)))?;
+    // 发送安装开始通知
+    send_progress_update(&window, "installing", 95, "正在安装更新...")?;
 
-    // 添加短暂延迟，确保文件操作完全完成
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    // 启动安装程序
+    info!("下载完成，启动安装程序: {:?}", target_path);
 
-    // Windows平台特定代码：启动安装程序
+    // 在Windows上启动安装程序
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new(&download_path)
+        std::process::Command::new(&target_path)
             .creation_flags(0x08000000) // 不显示窗口
             .spawn()
             .map_err(|e| AppError::ExecutionError(format!("启动安装程序失败: {}", e)))?;
     }
 
-    // 非Windows平台
+    // 在非Windows平台上启动安装程序
     #[cfg(not(target_os = "windows"))]
     {
-        std::process::Command::new(&download_path)
+        std::process::Command::new(&target_path)
             .spawn()
             .map_err(|e| AppError::ExecutionError(format!("启动安装程序失败: {}", e)))?;
     }
+
+    // 发送完成通知
+    send_progress_update(&window, "completed", 100, "更新已完成，请重启应用")?;
 
     Ok(())
 }

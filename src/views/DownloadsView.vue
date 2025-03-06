@@ -7,7 +7,7 @@
       </div>
 
       <div class="controls-section">
-        <NInputGroup>
+        <NInputGroup class="search-box">
           <NInput
             v-model:value="searchQuery"
             placeholder="搜索已下载修改器..."
@@ -18,73 +18,80 @@
               <NIcon><SearchOutline /></NIcon>
             </template>
           </NInput>
-
-          <NDropdown :options="sortOptions" v-model:value="sortBy">
-            <NButton>
-              排序
-              <template #icon>
-                <NIcon><FilterOutline /></NIcon>
-              </template>
-            </NButton>
-          </NDropdown>
-
-          <NButton @click="toggleViewMode('grid')" :quaternary="viewMode !== 'grid'">
-            <template #icon>
-              <NIcon><AppsOutline /></NIcon>
-            </template>
-          </NButton>
-
-          <NButton @click="toggleViewMode('list')" :quaternary="viewMode !== 'list'">
-            <template #icon>
-              <NIcon><ListOutline /></NIcon>
-            </template>
-          </NButton>
         </NInputGroup>
+
+        <NDropdown
+          trigger="click"
+          :options="sortOptions"
+          @select="(key: string) => (sortBy = key)"
+          :value="sortBy"
+        >
+          <NButton class="sort-button">
+            <template #icon>
+              <NIcon><FilterOutline /></NIcon>
+            </template>
+            {{ sortOptions.find((o) => o.key === sortBy)?.label || '排序' }}
+            <NIcon style="margin-left: 4px">
+              <ChevronDownOutline />
+            </NIcon>
+          </NButton>
+        </NDropdown>
       </div>
     </section>
 
     <NDivider />
 
-    <!-- 加载状态 -->
+    <section class="stats-section" v-if="filteredTrainers.length > 0">
+      <NStatistic class="statistic-item">
+        <template #label>
+          <div class="statistic-label">
+            <NIcon class="statistic-icon"><DownloadOutline /></NIcon>
+            <span>已下载修改器</span>
+          </div>
+        </template>
+        {{ store.downloadedTrainers.length }} 个
+      </NStatistic>
+
+      <NStatistic class="statistic-item">
+        <template #label>
+          <div class="statistic-label">
+            <NIcon class="statistic-icon"><SearchOutline /></NIcon>
+            <span>当前显示</span>
+          </div>
+        </template>
+        {{ filteredTrainers.length }} 个
+      </NStatistic>
+    </section>
+
     <div v-if="store.isLoading" class="loading-container">
       <NSpin size="large" />
     </div>
 
-    <!-- 空状态 -->
     <NEmpty
       v-else-if="!filteredTrainers.length"
       class="empty-state"
-      description="没有找到已下载的修改器"
+      :description="searchQuery ? `没有找到与 '${searchQuery}' 相关的修改器` : '没有已下载的修改器'"
     >
       <template #extra>
-        <NButton @click="router.push('/')">浏览修改器</NButton>
+        <NSpace>
+          <NButton @click="router.push('/')">浏览修改器</NButton>
+          <NButton v-if="searchQuery" @click="clearSearch">清除搜索</NButton>
+        </NSpace>
       </template>
     </NEmpty>
 
-    <!-- 网格视图 -->
-    <div v-else-if="viewMode === 'grid'" class="grid-view">
+    <div v-else class="grid-view">
       <NGrid cols="1 s:2 m:3 l:4" responsive="screen" :x-gap="16" :y-gap="24">
         <NGridItem v-for="trainer in filteredTrainers" :key="trainer.id">
           <GameCard :trainer="trainer" showButtons="downloaded" />
         </NGridItem>
       </NGrid>
     </div>
-
-    <!-- 列表视图 -->
-    <div v-else class="list-view">
-      <NDataTable
-        :columns="columns"
-        :data="filteredTrainers"
-        :pagination="{ pageSize: 10 }"
-        :bordered="false"
-        striped
-      />
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   PlayOutline,
@@ -92,37 +99,47 @@ import {
   InformationCircleOutline,
   SearchOutline,
   FilterOutline,
-  AppsOutline,
-  ListOutline,
+  ChevronDownOutline,
+  DownloadOutline,
+  TimeOutline,
 } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
 import GameCard from '@/components/common/GameCard.vue'
 import type { Trainer } from '@/types'
-import { NAvatar, NButton, NIcon, NSpace, NTag } from 'naive-ui'
+import { useMessage, useDialog, NButton, NIcon } from 'naive-ui'
 
 const router = useRouter()
 const store = useTrainerStore()
+const message = useMessage()
+const dialog = useDialog()
 
-// 视图模式
-const viewMode = ref('grid') // 'grid' 或 'list'
-
-// 搜索与筛选
+// 状态
 const searchQuery = ref('')
-const sortBy = ref('installTime')
+const sortBy = ref('installTime') // 默认按安装时间排序
 
 // 排序选项
 const sortOptions = [
-  { label: '安装时间', value: 'installTime' },
-  { label: '上次启动', value: 'lastLaunch' },
-  { label: '名称', value: 'name' },
+  {
+    label: '安装时间',
+    key: 'installTime',
+    icon: TimeOutline,
+  },
+  {
+    label: '使用时间',
+    key: 'lastUsed',
+    icon: TimeOutline,
+  },
+  {
+    label: '名称',
+    key: 'name',
+    icon: SearchOutline,
+  },
 ]
 
-// 当前展示的训练器列表
 const filteredTrainers = computed(() => {
   let result = [...store.downloadedTrainers]
 
-  // 搜索过滤
-  if (searchQuery.value) {
+  if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(
       (trainer) =>
@@ -131,129 +148,74 @@ const filteredTrainers = computed(() => {
     )
   }
 
-  // 排序
-  if (sortBy.value === 'installTime') {
-    result.sort((a, b) => {
-      const timeA = new Date(a.install_time || 0).getTime()
-      const timeB = new Date(b.install_time || 0).getTime()
-      return timeB - timeA // 降序，最新安装的排前面
-    })
-  } else if (sortBy.value === 'lastLaunch') {
-    result.sort((a, b) => {
-      const timeA = a.last_launch_time ? new Date(a.last_launch_time).getTime() : 0
-      const timeB = b.last_launch_time ? new Date(b.last_launch_time).getTime() : 0
-      return timeB - timeA
-    })
-  } else if (sortBy.value === 'name') {
-    result.sort((a, b) => a.name.localeCompare(b.name))
+  switch (sortBy.value) {
+    case 'installTime':
+      result.sort((a, b) => {
+        const timeA = a.install_time ? new Date(a.install_time).getTime() : 0
+        const timeB = b.install_time ? new Date(b.install_time).getTime() : 0
+        return timeB - timeA
+      })
+      break
+    case 'lastUsed':
+      result.sort((a, b) => {
+        const timeA = a.last_launch_time ? new Date(a.last_launch_time).getTime() : 0
+        const timeB = b.last_launch_time ? new Date(b.last_launch_time).getTime() : 0
+        return timeB - timeA
+      })
+      break
+    case 'name':
+      result.sort((a, b) => a.name.localeCompare(b.name))
+      break
   }
 
   return result
 })
 
-// 表格列定义
-const columns = [
-  {
-    title: '修改器',
-    key: 'name',
-    render(row: Trainer) {
-      return h(
-        NSpace,
-        { align: 'center' },
-        {
-          default: () => [
-            h(NAvatar, {
-              src: row.thumbnail,
-              round: false,
-              objectFit: 'cover',
-              size: 'small',
-            }),
-            h('div', { style: 'display: flex; flex-direction: column;' }, [
-              h('div', { style: 'font-weight: 600;' }, row.name),
-              h(
-                'div',
-                { style: 'font-size: 12px; color: var(--text-tertiary);' },
-                `v${row.version}`,
-              ),
-            ]),
-          ],
-        },
-      )
-    },
-  },
-  {
-    title: '游戏版本',
-    key: 'game_version',
-    render(row: Trainer) {
-      return h(NTag, { size: 'small', round: true }, { default: () => row.game_version })
-    },
-  },
-  {
-    title: '安装时间',
-    key: 'install_time',
-    render(row: Trainer) {
-      return row.install_time ? formatDate(row.install_time) : '未知'
-    },
-  },
-  {
-    title: '最后使用',
-    key: 'last_launch_time',
-    render(row: Trainer) {
-      return row.last_launch_time ? formatDate(row.last_launch_time) : '未使用'
-    },
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    render(row: Trainer) {
-      return h(
-        NSpace,
-        { justify: 'end' },
-        {
-          default: () => [
-            h(
-              NButton,
-              {
-                quaternary: true,
-                size: 'small',
-                onClick: () => router.push(`/detail/${row.id}`),
-              },
-              { icon: () => h(NIcon, null, { default: () => h(InformationCircleOutline) }) },
-            ),
+const handleSearch = () => {
+  // 搜索是通过 filteredTrainers 计算属性自动处理的
+}
 
-            h(
-              NButton,
-              {
-                quaternary: true,
-                size: 'small',
-                type: 'success',
-                onClick: () => handleLaunch(row),
-              },
-              { icon: () => h(NIcon, null, { default: () => h(PlayOutline) }) },
-            ),
+const clearSearch = () => {
+  searchQuery.value = ''
+}
 
-            h(
-              NButton,
-              {
-                quaternary: true,
-                size: 'small',
-                type: 'error',
-                onClick: () => handleDelete(row),
-              },
-              { icon: () => h(NIcon, null, { default: () => h(TrashOutline) }) },
-            ),
-          ],
-        },
-      )
+const viewDetails = (id: string) => {
+  router.push(`/detail/${id}`)
+}
+
+const handleDelete = async (trainer: Trainer) => {
+  dialog.warning({
+    title: '确认删除',
+    content: `确定要删除修改器"${trainer.name}"吗？`,
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.deleteTrainer(trainer.id)
+        message.success('修改器已删除')
+      } catch (error) {
+        console.error('删除失败:', error)
+        message.error(error instanceof Error ? error.message : '删除失败')
+      }
     },
-  },
-]
+  })
+}
 
-// 格式化日期
+const handleLaunch = async (trainer: Trainer) => {
+  try {
+    message.loading('正在启动修改器...')
+    await store.launchTrainer(trainer.id)
+    message.success('修改器启动成功')
+  } catch (error) {
+    console.error('启动失败:', error)
+    message.error(error instanceof Error ? error.message : '启动失败')
+  }
+}
+
 const formatDate = (dateString: string | undefined | null) => {
   if (!dateString) return '未知'
   const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',
@@ -262,109 +224,105 @@ const formatDate = (dateString: string | undefined | null) => {
   })
 }
 
-// 获取已安装训练器信息
-const getInstallInfo = (id: string) => {
-  return store.installedTrainers.find((t) => t.id === id)
-}
-
-// 启动训练器
-const handleLaunch = async (trainer: Trainer) => {
-  try {
-    await store.launchTrainer(trainer.id)
-  } catch (error) {
-    console.error('启动失败:', error)
-  }
-}
-
-// 删除训练器
-const handleDelete = async (trainer: Trainer) => {
-  if (confirm(`确定要删除修改器"${trainer.name}"吗？`)) {
-    try {
-      await store.deleteTrainer(trainer.id)
-    } catch (error) {
-      console.error('删除失败:', error)
-    }
-  }
-}
-
-// 搜索处理
-const handleSearch = () => {
-  // 搜索通过计算属性处理
-}
-
-// 切换视图模式
-const toggleViewMode = (mode: string) => {
-  viewMode.value = mode
-}
-
-onMounted(async () => {
+onMounted(() => {
   if (store.downloadedTrainers.length === 0) {
-    // 加载数据
-    await store.initialize()
+    store.initialize()
   }
 })
 </script>
 
 <style scoped>
 .downloads-view {
-  width: 100%;
+  padding-bottom: 2rem;
 }
 
 .header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
 }
 
 .title-section {
-  flex: 1;
-  min-width: 250px;
+  margin-bottom: 1.5rem;
 }
 
 .page-title {
   font-size: 1.75rem;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 0.5rem 0;
   color: var(--text-primary);
 }
 
 .page-subtitle {
-  color: var(--text-tertiary);
-  font-size: 0.95rem;
+  font-size: 1rem;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .controls-section {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 240px;
+}
+
+.sort-button {
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+}
+
+.stats-section {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
 
-.loading-container,
-.empty-state {
+.statistic-item {
+  background-color: var(--card-bg-subtle);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  flex: 1;
+  min-width: 200px;
+}
+
+.statistic-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.statistic-icon {
+  color: var(--primary);
+}
+
+.grid-view {
+  margin-bottom: 2rem;
+}
+
+.loading-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 200px;
-  margin: 2rem 0;
+  min-height: 300px;
 }
 
-.grid-view,
-.list-view {
-  margin-top: 1.5rem;
+.empty-state {
+  padding: 3rem 0;
 }
 
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .header-section {
+@media (max-width: 640px) {
+  .controls-section {
     flex-direction: column;
-    align-items: stretch;
   }
 
-  .controls-section {
+  .search-box {
     width: 100%;
   }
 

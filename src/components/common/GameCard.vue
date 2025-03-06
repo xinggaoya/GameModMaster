@@ -53,6 +53,11 @@ const statusTag = computed(() => {
   return { text: '未安装', type: 'default' as const, icon: '' }
 })
 
+// 计算是否已下载
+const isDownloaded = computed(() => {
+  return store.downloadedTrainers.some((t) => t.id === props.trainer.id)
+})
+
 // 防止事件冒泡
 const stopPropagation = (e: Event) => {
   e.stopPropagation()
@@ -62,12 +67,16 @@ const stopPropagation = (e: Event) => {
 const handleDownload = async (e: Event) => {
   stopPropagation(e)
   try {
+    // 显示加载中
+    message.loading('正在获取修改器信息...')
+
     // 先获取最新的trainer详情
     const latestTrainerDetail = await store.getTrainerDetail(props.trainer.id)
 
+    message.loading('准备下载修改器...')
     // 使用最新的trainer详情进行下载
     await store.downloadTrainer(latestTrainerDetail)
-    message.success('下载成功')
+    message.success('修改器下载成功')
   } catch (error) {
     console.error('下载失败:', error)
     message.error(error instanceof Error ? error.message : '下载失败')
@@ -78,6 +87,7 @@ const handleDownload = async (e: Event) => {
 const handleLaunch = async (e: Event) => {
   stopPropagation(e)
   try {
+    message.loading('正在启动修改器...')
     await store.launchTrainer(props.trainer.id)
     message.success('修改器启动成功')
   } catch (error) {
@@ -98,7 +108,7 @@ const handleDelete = async (e: Event) => {
     onPositiveClick: async () => {
       try {
         await store.deleteTrainer(props.trainer.id)
-        message.success('删除成功')
+        message.success('修改器已删除')
       } catch (error) {
         console.error('删除失败:', error)
         message.error(error instanceof Error ? error.message : '删除失败')
@@ -106,161 +116,176 @@ const handleDelete = async (e: Event) => {
     },
   })
 }
-
-// 处理查看详情按钮点击
-const handleViewDetails = (e: Event) => {
-  stopPropagation(e)
-  router.push(`/detail/${props.trainer.id}`)
-}
 </script>
 
 <template>
-  <NCard class="game-card" :class="{ 'is-loading': loading }" hoverable @click="handleCardClick">
-    <template #cover>
-      <div class="card-cover">
-        <NSkeleton v-if="loading" :width="240" :height="135" />
-        <NImage v-else :src="trainer.thumbnail" :alt="trainer.name" object-fit="cover" />
-
-        <!-- 状态标签 -->
-        <NTag v-if="!loading" class="status-tag" size="small" :type="statusTag.type" round>
-          {{ statusTag.text }}
-        </NTag>
+  <NCard
+    class="game-card"
+    :class="{ loading }"
+    hoverable
+    @click="handleCardClick"
+    content-style="padding: 0"
+  >
+    <!-- 图片容器 -->
+    <div class="card-image-container">
+      <div class="card-image-wrapper">
+        <NImage
+          class="card-image"
+          :src="trainer.thumbnail"
+          width="100%"
+          fallback-src="/placeholder.png"
+          :alt="trainer.name"
+          :preview-disabled="true"
+          object-fit="cover"
+          loading="lazy"
+        />
       </div>
-    </template>
 
-    <NSkeleton v-if="loading" text :repeat="2" />
-    <template v-else>
-      <h3 class="card-title">
-        <NEllipsis :tooltip="false">
-          {{ trainer.name }}
-        </NEllipsis>
-      </h3>
+      <!-- 状态标签 -->
+      <div class="status-tag" v-if="isDownloaded">
+        <NTag type="success" size="small">已下载</NTag>
+      </div>
+    </div>
+
+    <!-- 卡片内容 -->
+    <div class="card-content">
+      <h3 class="card-title" :title="trainer.name">{{ trainer.name }}</h3>
 
       <div class="card-meta">
         <div class="meta-item">
-          <NIcon><TimeOutline /></NIcon>
+          <NIcon class="meta-icon"><TimeOutline /></NIcon>
           <span>{{ formatDate(trainer.last_update) }}</span>
         </div>
-        <NTag size="small" round>v{{ trainer.version }}</NTag>
+
+        <div class="meta-item">
+          <NIcon class="meta-icon"><DownloadOutline /></NIcon>
+          <span>{{ trainer.download_count }}</span>
+        </div>
       </div>
 
-      <div class="card-description">
-        <NEllipsis :line-clamp="2" :tooltip="false">
-          {{ trainer.description || '暂无描述' }}
-        </NEllipsis>
-      </div>
-
+      <!-- 按钮区域 -->
       <div class="card-actions">
-        <!-- 默认模式：详情+下载 -->
-        <NSpace v-if="showButtons === 'default'" justify="space-between">
-          <!-- 详情按钮 -->
-          <NButton size="small" secondary @click="handleViewDetails">
+        <!-- 默认按钮：详情和下载 -->
+        <template v-if="showButtons === 'default'">
+          <NButton type="primary" secondary size="small" @click.stop="handleCardClick">
             <template #icon>
               <NIcon><EyeOutline /></NIcon>
             </template>
             详情
           </NButton>
 
-          <!-- 下载按钮 -->
-          <NButton size="small" type="primary" @click="handleDownload">
+          <NButton
+            type="primary"
+            ghost
+            size="small"
+            @click="handleDownload"
+            :disabled="isDownloaded"
+          >
             <template #icon>
               <NIcon><DownloadOutline /></NIcon>
             </template>
-            下载
+            {{ isDownloaded ? '已下载' : '下载' }}
           </NButton>
-        </NSpace>
+        </template>
 
-        <!-- 已下载模式：详情+删除+启动 -->
-        <NSpace v-else-if="showButtons === 'downloaded'" justify="space-between">
-          <!-- 详情按钮 -->
-          <NButton size="small" secondary @click="handleViewDetails">
+        <!-- 已下载按钮：详情、删除和启动 -->
+        <template v-else-if="showButtons === 'downloaded'">
+          <NButton type="info" secondary size="small" @click.stop="handleCardClick">
             <template #icon>
               <NIcon><EyeOutline /></NIcon>
             </template>
             详情
           </NButton>
 
-          <!-- 删除按钮 -->
-          <NButton size="small" type="error" @click="handleDelete">
+          <NButton type="error" ghost size="small" @click="handleDelete">
             <template #icon>
               <NIcon><TrashOutline /></NIcon>
             </template>
             删除
           </NButton>
 
-          <!-- 启动按钮 -->
-          <NButton size="small" type="success" @click="handleLaunch">
+          <NButton type="success" ghost size="small" @click="handleLaunch">
             <template #icon>
               <NIcon><PlayOutline /></NIcon>
             </template>
             启动
           </NButton>
-        </NSpace>
+        </template>
       </div>
-    </template>
+    </div>
   </NCard>
 </template>
 
 <style scoped>
 .game-card {
-  cursor: pointer;
+  position: relative;
   transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .game-card:hover {
   transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
 }
 
-.game-card.is-loading {
-  cursor: default;
-}
-
-.card-cover {
+.card-image-container {
   position: relative;
-  height: 135px;
   overflow: hidden;
-  background: var(--gray-200);
+  aspect-ratio: 16/9;
+  width: 100%;
 }
 
-.card-cover :deep(img) {
+.card-image-wrapper {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transition: transform var(--transition-normal);
 }
 
-.game-card:hover .card-cover :deep(img) {
+.card-image {
+  width: 100%;
+  height: 100%;
+  object-position: center;
+  transition: transform 0.3s ease;
+  border-radius: 0;
+}
+
+.game-card:hover .card-image {
   transform: scale(1.05);
 }
 
 .status-tag {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
+  top: 8px;
+  right: 8px;
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  flex-grow: 1;
 }
 
 .card-title {
-  margin: 0.5rem 0;
-  font-size: 1rem;
+  margin: 0 0 8px 0;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary);
-  font-family: var(--font-gaming);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-meta {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-color-secondary);
 }
 
 .meta-item {
@@ -269,27 +294,23 @@ const handleViewDetails = (e: Event) => {
   gap: 4px;
 }
 
-.meta-item :deep(.n-icon) {
-  font-size: 0.9rem;
-}
-
-.card-description {
-  margin-bottom: 1rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  flex-grow: 1;
+.meta-icon {
+  font-size: 14px;
 }
 
 .card-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: auto;
 }
 
-/* 修改按钮布局，确保多个按钮能够均匀分布 */
-.card-actions :deep(.n-space) {
-  width: 100%;
+.card-actions button {
+  flex: 1;
 }
 
-.card-actions :deep(.n-button) {
-  padding: 0 8px;
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
 }
 </style>

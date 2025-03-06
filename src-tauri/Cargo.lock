@@ -121,6 +121,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "directories",
+ "futures-util",
  "log",
  "reqwest",
  "scraper",

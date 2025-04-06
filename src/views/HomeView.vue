@@ -329,6 +329,12 @@ onMounted(async () => {
   z-index: 1;
 }
 
+:deep(.dark) .welcome-section,
+.dark .welcome-section {
+  background: #1e1e1e;
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.2);
+}
+
 /* 装饰元素 - 点阵 */
 .decoration-dots {
   position: absolute;
@@ -397,6 +403,11 @@ onMounted(async () => {
   animation: fadeIn 1s ease-out;
 }
 
+:deep(.dark) .welcome-title,
+.dark .welcome-title {
+  color: #818cf8;
+}
+
 @keyframes fadeIn {
   0% {
     opacity: 0;
@@ -423,8 +434,9 @@ onMounted(async () => {
   border-color: #e5e7eb;
 }
 
-.search-container :deep(.n-button--primary-type) {
-  background-color: #595bff;
+:deep(.dark) .search-container :deep(.n-input),
+.dark .search-container :deep(.n-input) {
+  border-color: #333;
 }
 
 .stats-section {

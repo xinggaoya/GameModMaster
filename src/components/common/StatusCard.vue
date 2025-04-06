@@ -36,6 +36,12 @@ const props = defineProps<{
   transition:
     transform var(--transition-fast),
     box-shadow var(--transition-fast);
+  background-color: white;
+}
+
+:deep(.dark) .status-card,
+.dark .status-card {
+  background-color: #1e1e1e;
 }
 
 .status-card:hover {
@@ -69,10 +75,20 @@ const props = defineProps<{
   margin-top: 4px;
 }
 
+:deep(.dark) .card-title,
+.dark .card-title {
+  color: #aaaaaa;
+}
+
 :deep(.n-statistic-value) {
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
   font-family: var(--font-gaming);
+}
+
+:deep(.dark) :deep(.n-statistic-value),
+.dark :deep(.n-statistic-value) {
+  color: #e1e1e1;
 }
 </style>

@@ -232,6 +232,7 @@ import {
 import { useTrainerStore } from '@/stores/trainer'
 import {
   useMessage,
+  useDialog,
   NProgress,
   NButton,
   NCard,
@@ -247,11 +248,13 @@ import {
   NTag,
 } from 'naive-ui'
 import type { Trainer } from '@/types'
+import { invoke } from '@tauri-apps/api/core'
 
 const router = useRouter()
 const route = useRoute()
 const store = useTrainerStore()
 const message = useMessage()
+const dialog = useDialog()
 
 // 状态
 const loading = ref(true)
@@ -324,7 +327,34 @@ const handleLaunch = async () => {
     await fetchTrainerDetail()
   } catch (error) {
     console.error('启动失败:', error)
-    message.error(error instanceof Error ? error.message : '启动失败')
+
+    // 检查是否是权限错误
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (
+      errorMsg.includes('Permission') ||
+      errorMsg.includes('权限') ||
+      errorMsg.includes('elevated privileges')
+    ) {
+      // 显示需要管理员权限的对话框
+      dialog.warning({
+        title: '需要管理员权限',
+        content: '启动修改器需要管理员权限。您可以选择以管理员身份重启应用程序，或者取消操作。',
+        positiveText: '以管理员身份重启',
+        negativeText: '取消',
+        onPositiveClick: async () => {
+          // 使用Tauri API请求以管理员身份重启应用
+          try {
+            message.info('正在以管理员身份重启应用...')
+            // 调用Windows API重启应用
+            await invoke('restart_as_admin')
+          } catch (e) {
+            message.error('重启失败，请手动以管理员身份运行应用')
+          }
+        },
+      })
+    } else {
+      message.error(errorMsg)
+    }
   }
 }
 

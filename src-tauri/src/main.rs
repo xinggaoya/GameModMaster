@@ -17,7 +17,8 @@ fn main() {
             api::trainer::launch_trainer,
             api::updater::check_update,
             api::updater::download_and_install_update,
-            api::updater::get_app_version
+            api::updater::get_app_version,
+            api::admin::restart_as_admin
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,8 +1,13 @@
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 use std::io::Write;
 use chrono::Local;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::UI::Shell::ShellExecuteW;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW;
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt;
 use crate::api::error::{AppError, AppResult};
 use crate::models::trainer::{Trainer, TrainerInstallInfo};
 use crate::utils::path::{get_downloads_dir, sanitize_filename};
@@ -169,17 +174,56 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
                                                     let info_json = serde_json::to_string_pretty(&install_info)?;
                                                     fs::write(&info_path, info_json)?;
 
-                                                    // 启动程序
-                                                    match Command::new(&file_path).spawn() {
-                                                        Ok(_) => return Ok(()),
-                                                        Err(e) => return Err(AppError::IoError(e)),
+                                                    // 使用Shell执行并请求管理员权限
+                                                    #[cfg(target_os = "windows")]
+                                                    {
+                                                        // 转换路径为宽字符
+                                                        let wide_path: Vec<u16> = file_path.as_os_str()
+                                                            .encode_wide()
+                                                            .chain(Some(0))
+                                                            .collect();
+                                                        let wide_operation: Vec<u16> = "runas".encode_utf16().chain(Some(0)).collect();
+                                                        let wide_dir: Vec<u16> = path.as_os_str()
+                                                            .encode_wide()
+                                                            .chain(Some(0))
+                                                            .collect();
+                                                        
+                                                        let result = unsafe {
+                                                            ShellExecuteW(
+                                                                0,
+                                                                wide_operation.as_ptr(),
+                                                                wide_path.as_ptr(),
+                                                                std::ptr::null(),
+                                                                wide_dir.as_ptr(),
+                                                                SW_SHOW,
+                                                            )
+                                                        };
+                                                        
+                                                        // ShellExecuteW返回值大于32表示成功
+                                                        if result as isize <= 32 {
+                                                            return Err(AppError::IoError(std::io::Error::new(
+                                                                std::io::ErrorKind::PermissionDenied,
+                                                                format!("启动修改器失败，需要管理员权限: {}", result),
+                                                            )));
+                                                        }
+                                                        
+                                                        return Ok(());
+                                                    }
+                                                    
+                                                    // 非Windows平台的默认行为
+                                                    #[cfg(not(target_os = "windows"))]
+                                                    {
+                                                        match Command::new(&file_path).spawn() {
+                                                            Ok(_) => return Ok(()),
+                                                            Err(e) => return Err(AppError::IoError(e)),
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                         return Err(AppError::IoError(std::io::Error::new(
                                             std::io::ErrorKind::NotFound,
-                                            "No executable file found in trainer directory",
+                                            "修改器目录中没有找到可执行文件",
                                         )));
                                     }
                                 }
@@ -193,6 +237,6 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
 
     Err(AppError::IoError(std::io::Error::new(
         std::io::ErrorKind::NotFound,
-        "Trainer not found",
+        "未找到修改器",
     )))
 } 

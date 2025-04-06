@@ -269,6 +269,12 @@ const handleDelete = async (e: Event) => {
   flex-direction: column;
   padding: 16px;
   flex-grow: 1;
+  background-color: white;
+}
+
+:deep(.dark) .card-content,
+.dark .card-content {
+  background-color: #1e1e1e;
 }
 
 .card-title {
@@ -278,6 +284,12 @@ const handleDelete = async (e: Event) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-color);
+}
+
+:deep(.dark) .card-title,
+.dark .card-title {
+  color: #e1e1e1;
 }
 
 .card-meta {
@@ -286,6 +298,11 @@ const handleDelete = async (e: Event) => {
   margin-bottom: 16px;
   font-size: 12px;
   color: var(--text-color-secondary);
+}
+
+:deep(.dark) .card-meta,
+.dark .card-meta {
+  color: #aaaaaa;
 }
 
 .meta-item {

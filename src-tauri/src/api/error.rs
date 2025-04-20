@@ -25,16 +25,16 @@ pub enum ErrorCode {
 pub enum AppError {
     #[error("网络请求失败: {0}")]
     RequestError(#[from] reqwest::Error),
-    
+
     #[error("HTML解析失败: {0}")]
     ParseError(String),
-    
+
     #[error("IO操作错误: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     #[error("下载错误: {0}")]
     DownloadError(String),
-    
+
     #[error("配置错误: {0}")]
     ConfigError(String),
 
@@ -43,21 +43,27 @@ pub enum AppError {
 
     #[error("压缩文件错误: {0}")]
     ZipError(#[from] ZipError),
-    
+
     #[error("验证失败: {0}")]
     ValidationError(String),
-    
+
     #[error("资源未找到: {0}")]
     NotFoundError(String),
-    
+
     #[error("权限错误: {0}")]
     PermissionError(String),
-    
+
     #[error("执行错误: {0}")]
     ExecutionError(String),
-    
+
     #[error("未知错误: {0}")]
     UnknownError(String),
+}
+
+// 错误详细信息
+#[derive(Debug, Clone)]
+pub struct ErrorDetails {
+    pub custom_message: Option<String>,
 }
 
 impl AppError {
@@ -78,7 +84,18 @@ impl AppError {
             AppError::UnknownError(_) => ErrorCode::Unknown,
         }
     }
-    
+
+    // 添加自定义错误详细信息
+    pub fn with_details(self, details: &str) -> Self {
+        match self {
+            AppError::ZipError(e) => {
+                // 对于ZIP错误，返回一个新的下载错误，带有自定义消息
+                AppError::DownloadError(details.to_string())
+            },
+            _ => self, // 其他错误类型暂时不处理
+        }
+    }
+
     // 获取用户友好的错误信息
     pub fn user_message(&self) -> String {
         match self {
@@ -120,4 +137,4 @@ impl Serialize for AppError {
     }
 }
 
-pub type AppResult<T> = Result<T, AppError>; 
+pub type AppResult<T> = Result<T, AppError>;

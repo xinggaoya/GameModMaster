@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::io::Write;
+use std::io::{Write, Read};
 use chrono::Local;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
@@ -20,10 +20,10 @@ pub async fn fetch_trainers(page: u32) -> AppResult<PaginatedResponse<Trainer>> 
     let response = reqwest::get(&url).await?;
     let html = response.text().await?;
     let trainers = scraper::parse_trainer_list(&html)?;
-    
+
     // 这里需要从网页中解析总数，暂时使用固定值
     let total = 120; // 假设总共有120个训练器
-    
+
     Ok(PaginatedResponse {
         trainers,
         total,
@@ -35,10 +35,10 @@ pub async fn search_trainers(query: String, page: u32) -> AppResult<PaginatedRes
     let response = reqwest::get(&url).await?;
     let html = response.text().await?;
     let trainers = scraper::parse_trainer_list(&html)?;
-    
+
     // 这里需要从搜索结果页面解析总数，暂时使用固定值
     let total = trainers.len() as u32;
-    
+
     Ok(PaginatedResponse {
         trainers,
         total,
@@ -101,15 +101,43 @@ pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
         ));
     }
 
-    // 解压文件
-    if let Err(e) = extract_zip(&temp_zip, &trainer_dir) {
-        fs::remove_dir_all(&trainer_dir)?;
-        fs::remove_file(&temp_zip)?;
-        return Err(e);
-    }
+    // 检查文件类型
+    let is_zip_file = is_zip_file(&temp_zip);
+    let is_exe_file = is_exe_file(&temp_zip);
 
-    // 清理临时文件
-    fs::remove_file(&temp_zip)?;
+    println!("文件类型检测: ZIP={}, EXE={}", is_zip_file, is_exe_file);
+
+    if is_zip_file {
+        // 如果是ZIP文件，解压
+        println!("检测到ZIP文件，开始解压...");
+        if let Err(e) = extract_zip(&temp_zip, &trainer_dir) {
+            println!("解压失败: {}", e);
+            fs::remove_dir_all(&trainer_dir)?;
+            fs::remove_file(&temp_zip)?;
+            return Err(e);
+        }
+        // 解压后删除临时文件
+        fs::remove_file(&temp_zip)?;
+    } else if is_exe_file {
+        // 如果是EXE文件，直接移动到目标目录
+        println!("检测到EXE文件，直接使用...");
+        let exe_filename = format!("{}.exe", trainer.id);
+        let target_exe_path = trainer_dir.join(&exe_filename);
+        fs::rename(&temp_zip, &target_exe_path)?;
+    } else {
+        // 未知文件类型，尝试作为ZIP处理
+        println!("未知文件类型，尝试作为ZIP处理...");
+        if let Err(e) = extract_zip(&temp_zip, &trainer_dir) {
+            println!("解压失败，尝试直接复制文件: {}", e);
+            // 解压失败，直接复制文件到目标目录
+            let target_file_path = trainer_dir.join(format!("unknown_file_{}.bin", trainer.id));
+            fs::copy(&temp_zip, &target_file_path)?;
+            fs::remove_file(&temp_zip)?;
+        } else {
+            // 解压成功，删除临时文件
+            fs::remove_file(&temp_zip)?;
+        }
+    }
 
     // 保存安装信息
     let install_info = TrainerInstallInfo {
@@ -118,7 +146,7 @@ pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
         install_time: Local::now().to_rfc3339(),
         last_launch_time: None,
     };
-    
+
     let info_json = serde_json::to_string_pretty(&install_info)?;
     fs::write(trainer_dir.join("trainer.json"), info_json)?;
 
@@ -127,7 +155,7 @@ pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
 
 pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
     let download_dir = get_downloads_dir()?;
-    
+
     if let Ok(entries) = fs::read_dir(download_dir) {
         for entry in entries.flatten() {
             if let Ok(path) = entry.path().canonicalize() {
@@ -151,9 +179,48 @@ pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
     Ok(())
 }
 
+// 检测文件是否为ZIP格式
+fn is_zip_file(file_path: &PathBuf) -> bool {
+    // 检查文件头部是否为ZIP格式的特征码 (PK\x03\x04)
+    let mut file = match std::fs::File::open(file_path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    let mut header_buffer = [0u8; 4];
+    if let Ok(bytes_read) = file.read(&mut header_buffer) {
+        if bytes_read >= 4 {
+            // ZIP文件的头部应该是PK\x03\x04
+            return header_buffer[0] == 0x50 && header_buffer[1] == 0x4B &&
+                   header_buffer[2] == 0x03 && header_buffer[3] == 0x04;
+        }
+    }
+
+    false
+}
+
+// 检测文件是否为EXE格式
+fn is_exe_file(file_path: &PathBuf) -> bool {
+    // 检查文件头部是否为EXE格式的特征码 (MZ)
+    let mut file = match std::fs::File::open(file_path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    let mut header_buffer = [0u8; 2];
+    if let Ok(bytes_read) = file.read(&mut header_buffer) {
+        if bytes_read >= 2 {
+            // EXE文件的头部应该是MZ (0x4D 0x5A)
+            return header_buffer[0] == 0x4D && header_buffer[1] == 0x5A;
+        }
+    }
+
+    false
+}
+
 pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
     let download_dir = get_downloads_dir()?;
-    
+
     if let Ok(entries) = fs::read_dir(download_dir) {
         for entry in entries.flatten() {
             if let Ok(path) = entry.path().canonicalize() {
@@ -187,7 +254,7 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
                                                             .encode_wide()
                                                             .chain(Some(0))
                                                             .collect();
-                                                        
+
                                                         let result = unsafe {
                                                             ShellExecuteW(
                                                                 0,
@@ -198,7 +265,7 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
                                                                 SW_SHOW,
                                                             )
                                                         };
-                                                        
+
                                                         // ShellExecuteW返回值大于32表示成功
                                                         if result as isize <= 32 {
                                                             return Err(AppError::IoError(std::io::Error::new(
@@ -206,10 +273,10 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
                                                                 format!("启动修改器失败，需要管理员权限: {}", result),
                                                             )));
                                                         }
-                                                        
+
                                                         return Ok(());
                                                     }
-                                                    
+
                                                     // 非Windows平台的默认行为
                                                     #[cfg(not(target_os = "windows"))]
                                                     {
@@ -239,4 +306,4 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
         std::io::ErrorKind::NotFound,
         "未找到修改器",
     )))
-} 
+}

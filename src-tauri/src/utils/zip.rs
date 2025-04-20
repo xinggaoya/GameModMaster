@@ -2,7 +2,42 @@ use std::fs::File;
 use std::io;
 use std::path::PathBuf;
 use zip::ZipArchive;
-use crate::api::error::AppResult;
+use crate::api::error::{AppError, AppResult};
+
+// 验证ZIP文件是否有效
+pub fn validate_zip(zip_path: &PathBuf) -> AppResult<()> {
+    // 尝试打开文件
+    let file = File::open(zip_path)?;
+
+    // 尝试解析为ZIP文件
+    match ZipArchive::new(file) {
+        Ok(archive) => {
+            // 检查是否为空
+            if archive.len() == 0 {
+                return Err(AppError::ValidationError("ZIP文件为空".to_string()));
+            }
+
+            // 验证成功
+            Ok(())
+        },
+        Err(e) => {
+            // 检查是否是中央目录结束标记缺失的错误
+            let error_str = e.to_string();
+            if error_str.contains("central directory") || error_str.contains("end of central directory") {
+                return Err(AppError::ZipError(e).with_details("压缩文件错误: invalid Zip archive: Could not find central directory end"));
+            }
+
+            // 检查文件大小
+            let metadata = std::fs::metadata(zip_path)?;
+            if metadata.len() < 100 { // 如果文件小于100字节，可能不是有效的zip文件
+                return Err(AppError::ValidationError("文件大小异常，可能不是有效的压缩文件".to_string()));
+            }
+
+            // 转换其他错误类型
+            Err(AppError::ZipError(e))
+        }
+    }
+}
 
 pub fn extract_zip(zip_path: &PathBuf, extract_dir: &PathBuf) -> AppResult<()> {
     let file = File::open(zip_path)?;
@@ -38,4 +73,4 @@ pub fn extract_zip(zip_path: &PathBuf, extract_dir: &PathBuf) -> AppResult<()> {
     }
 
     Ok(())
-} 
+}

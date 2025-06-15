@@ -1,19 +1,22 @@
-use std::fs;
-use std::path::PathBuf;
-use std::io::{Write, Read};
+use crate::api::error::{AppError, AppResult};
+use crate::api::trainer::PaginatedResponse;
+use crate::models::trainer::{Trainer, TrainerInstallInfo};
+use crate::services::download_manager;
+use crate::services::scraper;
+use crate::utils::path::{get_downloads_dir, sanitize_filename};
+use crate::utils::zip::extract_zip;
 use chrono::Local;
+use std::fs;
+use std::io::Read;
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt;
+use std::path::PathBuf;
+use tauri::Emitter;
+use tauri::Manager;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW;
-#[cfg(target_os = "windows")]
-use std::os::windows::ffi::OsStrExt;
-use crate::api::error::{AppError, AppResult};
-use crate::models::trainer::{Trainer, TrainerInstallInfo};
-use crate::utils::path::{get_downloads_dir, sanitize_filename};
-use crate::utils::zip::extract_zip;
-use crate::services::scraper;
-use crate::api::trainer::PaginatedResponse;
 
 pub async fn fetch_trainers(page: u32) -> AppResult<PaginatedResponse<Trainer>> {
     let url = format!("https://flingtrainer.com/page/{}/", page);
@@ -24,10 +27,7 @@ pub async fn fetch_trainers(page: u32) -> AppResult<PaginatedResponse<Trainer>> 
     // 这里需要从网页中解析总数，暂时使用固定值
     let total = 120; // 假设总共有120个训练器
 
-    Ok(PaginatedResponse {
-        trainers,
-        total,
-    })
+    Ok(PaginatedResponse { trainers, total })
 }
 
 pub async fn search_trainers(query: String, page: u32) -> AppResult<PaginatedResponse<Trainer>> {
@@ -39,10 +39,7 @@ pub async fn search_trainers(query: String, page: u32) -> AppResult<PaginatedRes
     // 这里需要从搜索结果页面解析总数，暂时使用固定值
     let total = trainers.len() as u32;
 
-    Ok(PaginatedResponse {
-        trainers,
-        total,
-    })
+    Ok(PaginatedResponse { trainers, total })
 }
 
 pub async fn get_trainer_detail(id: String) -> AppResult<Trainer> {
@@ -52,8 +49,14 @@ pub async fn get_trainer_detail(id: String) -> AppResult<Trainer> {
     scraper::parse_trainer_detail(&html)
 }
 
-pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
-    println!("开始下载修改器: {} ({})", trainer.name, trainer.download_url);
+pub async fn download_trainer<R: tauri::Runtime>(
+    app_handle: tauri::AppHandle<R>,
+    trainer: Trainer,
+) -> AppResult<PathBuf> {
+    println!(
+        "开始下载修改器: {} ({})",
+        trainer.name, trainer.download_url
+    );
 
     let download_dir = get_downloads_dir()?;
     fs::create_dir_all(&download_dir)?;
@@ -71,28 +74,21 @@ pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
     // 创建修改器目录
     fs::create_dir_all(&trainer_dir)?;
 
-    // 下载文件
-    let response = reqwest::get(&trainer.download_url).await?;
-    if !response.status().is_success() {
-        return Err(AppError::DownloadError(format!(
-            "Download failed with status: {}",
-            response.status()
-        )));
-    }
-
     // 临时zip文件
-    let temp_zip = download_dir.join("temp.zip");
+    let temp_zip = download_dir.join(format!("temp_{}.zip", trainer.id));
     if temp_zip.exists() {
         fs::remove_file(&temp_zip)?;
     }
 
-    // 写入临时文件
-    {
-        let mut file = fs::File::create(&temp_zip)?;
-        let content = response.bytes().await?;
-        std::io::copy(&mut content.as_ref(), &mut file)?;
-        file.flush()?;
-    }
+    // 使用下载管理器下载文件
+    download_manager::download_file_with_progress(
+        app_handle.clone(),
+        &trainer.download_url,
+        &trainer.id,
+        &temp_zip,
+        "download-progress",
+    )
+    .await?;
 
     // 验证临时文件
     if !temp_zip.exists() || fs::metadata(&temp_zip)?.len() == 0 {
@@ -107,6 +103,20 @@ pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
 
     println!("文件类型检测: ZIP={}, EXE={}", is_zip_file, is_exe_file);
 
+    // 发送处理进度
+    let _ = app_handle.emit(
+        "download-progress",
+        serde_json::json!({
+            "trainer_id": trainer.id,
+            "status": "processing",
+            "progress": 100.0,
+            "downloaded_bytes": fs::metadata(&temp_zip)?.len(),
+            "total_bytes": fs::metadata(&temp_zip)?.len(),
+            "speed": null
+        }),
+    );
+
+    // 处理下载的文件
     if is_zip_file {
         // 如果是ZIP文件，解压
         println!("检测到ZIP文件，开始解压...");
@@ -150,33 +160,20 @@ pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
     let info_json = serde_json::to_string_pretty(&install_info)?;
     fs::write(trainer_dir.join("trainer.json"), info_json)?;
 
+    // 发送完成进度
+    let _ = app_handle.emit(
+        "download-progress",
+        serde_json::json!({
+            "trainer_id": trainer.id,
+            "status": "completed",
+            "progress": 100.0,
+            "downloaded_bytes": fs::metadata(&temp_zip).map(|m| m.len()).unwrap_or(0),
+            "total_bytes": fs::metadata(&temp_zip).map(|m| m.len()).unwrap_or(0),
+            "speed": null
+        }),
+    );
+
     Ok(trainer_dir)
-}
-
-pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
-    let download_dir = get_downloads_dir()?;
-
-    if let Ok(entries) = fs::read_dir(download_dir) {
-        for entry in entries.flatten() {
-            if let Ok(path) = entry.path().canonicalize() {
-                if path.is_dir() {
-                    let info_path = path.join("trainer.json");
-                    if info_path.exists() {
-                        if let Ok(content) = fs::read_to_string(&info_path) {
-                            if let Ok(install_info) = serde_json::from_str::<TrainerInstallInfo>(&content) {
-                                if install_info.trainer.id == trainer_id {
-                                    fs::remove_dir_all(path)?;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
 }
 
 // 检测文件是否为ZIP格式
@@ -191,8 +188,10 @@ fn is_zip_file(file_path: &PathBuf) -> bool {
     if let Ok(bytes_read) = file.read(&mut header_buffer) {
         if bytes_read >= 4 {
             // ZIP文件的头部应该是PK\x03\x04
-            return header_buffer[0] == 0x50 && header_buffer[1] == 0x4B &&
-                   header_buffer[2] == 0x03 && header_buffer[3] == 0x04;
+            return header_buffer[0] == 0x50
+                && header_buffer[1] == 0x4B
+                && header_buffer[2] == 0x03
+                && header_buffer[3] == 0x04;
         }
     }
 
@@ -220,79 +219,22 @@ fn is_exe_file(file_path: &PathBuf) -> bool {
 
 pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
     let download_dir = get_downloads_dir()?;
+    let mut trainer_path = None;
+    let mut executable_path = None;
 
-    if let Ok(entries) = fs::read_dir(download_dir) {
+    if let Ok(entries) = fs::read_dir(&download_dir) {
         for entry in entries.flatten() {
             if let Ok(path) = entry.path().canonicalize() {
                 if path.is_dir() {
                     let info_path = path.join("trainer.json");
                     if info_path.exists() {
                         if let Ok(content) = fs::read_to_string(&info_path) {
-                            if let Ok(mut install_info) = serde_json::from_str::<TrainerInstallInfo>(&content) {
+                            if let Ok(install_info) =
+                                serde_json::from_str::<TrainerInstallInfo>(&content)
+                            {
                                 if install_info.trainer.id == trainer_id {
-                                    // 搜索可执行文件
-                                    if let Ok(files) = fs::read_dir(&path) {
-                                        for file in files.flatten() {
-                                            let file_path = file.path();
-                                            if let Some(extension) = file_path.extension() {
-                                                if extension == "exe" {
-                                                    // 更新启动时间
-                                                    install_info.last_launch_time = Some(Local::now().to_rfc3339());
-                                                    let info_json = serde_json::to_string_pretty(&install_info)?;
-                                                    fs::write(&info_path, info_json)?;
-
-                                                    // 使用Shell执行并请求管理员权限
-                                                    #[cfg(target_os = "windows")]
-                                                    {
-                                                        // 转换路径为宽字符
-                                                        let wide_path: Vec<u16> = file_path.as_os_str()
-                                                            .encode_wide()
-                                                            .chain(Some(0))
-                                                            .collect();
-                                                        let wide_operation: Vec<u16> = "runas".encode_utf16().chain(Some(0)).collect();
-                                                        let wide_dir: Vec<u16> = path.as_os_str()
-                                                            .encode_wide()
-                                                            .chain(Some(0))
-                                                            .collect();
-
-                                                        let result = unsafe {
-                                                            ShellExecuteW(
-                                                                0,
-                                                                wide_operation.as_ptr(),
-                                                                wide_path.as_ptr(),
-                                                                std::ptr::null(),
-                                                                wide_dir.as_ptr(),
-                                                                SW_SHOW,
-                                                            )
-                                                        };
-
-                                                        // ShellExecuteW返回值大于32表示成功
-                                                        if result as isize <= 32 {
-                                                            return Err(AppError::IoError(std::io::Error::new(
-                                                                std::io::ErrorKind::PermissionDenied,
-                                                                format!("启动修改器失败，需要管理员权限: {}", result),
-                                                            )));
-                                                        }
-
-                                                        return Ok(());
-                                                    }
-
-                                                    // 非Windows平台的默认行为
-                                                    #[cfg(not(target_os = "windows"))]
-                                                    {
-                                                        match Command::new(&file_path).spawn() {
-                                                            Ok(_) => return Ok(()),
-                                                            Err(e) => return Err(AppError::IoError(e)),
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        return Err(AppError::IoError(std::io::Error::new(
-                                            std::io::ErrorKind::NotFound,
-                                            "修改器目录中没有找到可执行文件",
-                                        )));
-                                    }
+                                    trainer_path = Some(path);
+                                    break;
                                 }
                             }
                         }
@@ -302,8 +244,120 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
         }
     }
 
-    Err(AppError::IoError(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "未找到修改器",
-    )))
+    let trainer_dir = match trainer_path {
+        Some(path) => path,
+        None => return Err(AppError::NotFoundError("修改器未找到".to_string())),
+    };
+
+    // 查找可执行文件 (EXE)
+    if let Ok(entries) = fs::read_dir(&trainer_dir) {
+        for entry in entries.flatten() {
+            if let Ok(path) = entry.path().canonicalize() {
+                if path.is_file() {
+                    if let Some(ext) = path.extension() {
+                        if ext.to_ascii_lowercase() == "exe" {
+                            executable_path = Some(path);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 如果没有找到EXE文件，尝试使用trainer_id.exe
+    if executable_path.is_none() {
+        let default_exe = trainer_dir.join(format!("{}.exe", trainer_id));
+        if default_exe.exists() {
+            executable_path = Some(default_exe);
+        }
+    }
+
+    let exe_path = match executable_path {
+        Some(path) => path,
+        None => return Err(AppError::NotFoundError("可执行文件未找到".to_string())),
+    };
+
+    println!("启动修改器: {}", exe_path.display());
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::OsStr;
+        use std::ptr;
+
+        let exe_path_str = exe_path.to_string_lossy().into_owned();
+        let mut wide_path: Vec<u16> = OsStr::new(&exe_path_str)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let result = unsafe {
+            ShellExecuteW(
+                0,
+                ptr::null_mut(),
+                wide_path.as_mut_ptr(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                SW_SHOW,
+            )
+        };
+
+        if result <= 32 {
+            return Err(AppError::ExecutionError(format!(
+                "启动修改器失败，错误码: {}",
+                result
+            )));
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // 非Windows系统的启动逻辑
+        use std::process::Command;
+
+        let status = Command::new(&exe_path).spawn();
+
+        if let Err(e) = status {
+            return Err(AppError::ExecutionError(format!("启动修改器失败: {}", e)));
+        }
+    }
+
+    // 更新最后启动时间
+    if let Ok(content) = fs::read_to_string(trainer_dir.join("trainer.json")) {
+        if let Ok(mut install_info) = serde_json::from_str::<TrainerInstallInfo>(&content) {
+            install_info.last_launch_time = Some(Local::now().to_rfc3339());
+            let updated_json = serde_json::to_string_pretty(&install_info)?;
+            fs::write(trainer_dir.join("trainer.json"), updated_json)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
+    let download_dir = get_downloads_dir()?;
+
+    if let Ok(entries) = fs::read_dir(download_dir) {
+        for entry in entries.flatten() {
+            if let Ok(path) = entry.path().canonicalize() {
+                if path.is_dir() {
+                    let info_path = path.join("trainer.json");
+                    if info_path.exists() {
+                        if let Ok(content) = fs::read_to_string(&info_path) {
+                            if let Ok(install_info) =
+                                serde_json::from_str::<TrainerInstallInfo>(&content)
+                            {
+                                if install_info.trainer.id == trainer_id {
+                                    fs::remove_dir_all(path)?;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

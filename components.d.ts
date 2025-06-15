@@ -9,7 +9,9 @@ declare module 'vue' {
   export interface GlobalComponents {
     ActionButton: typeof import('./src/components/common/ActionButton.vue')['default']
     CheckUpdateButton: typeof import('./src/components/update/CheckUpdateButton.vue')['default']
+    DownloadProgress: typeof import('./src/components/common/DownloadProgress.vue')['default']
     GameCard: typeof import('./src/components/common/GameCard.vue')['default']
+    LogViewer: typeof import('./src/components/common/LogViewer.vue')['default']
     MainLayout: typeof import('./src/components/layouts/MainLayout.vue')['default']
     NButton: typeof import('naive-ui')['NButton']
     NCard: typeof import('naive-ui')['NCard']

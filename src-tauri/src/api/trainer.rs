@@ -1,14 +1,26 @@
+use crate::api::error::AppResult;
 use crate::models::trainer::Trainer;
 use crate::services::trainer as trainer_service;
-use crate::api::error::AppResult;
-use std::path::PathBuf;
 use serde::Serialize;
+use std::path::PathBuf;
+use tauri::Runtime;
 
 // 分页响应结构体
 #[derive(Serialize)]
 pub struct PaginatedResponse<T> {
     pub trainers: Vec<T>,
     pub total: u32,
+}
+
+// 下载进度响应
+#[derive(Clone, Serialize)]
+pub struct DownloadProgress {
+    pub trainer_id: String,
+    pub progress: f64, // 0-100
+    pub downloaded_bytes: u64,
+    pub total_bytes: Option<u64>,
+    pub status: String,     // "downloading", "completed", "error"
+    pub speed: Option<f64>, // 下载速度 KB/s
 }
 
 #[tauri::command]
@@ -27,8 +39,11 @@ pub async fn get_trainer_detail(id: String) -> AppResult<Trainer> {
 }
 
 #[tauri::command]
-pub async fn download_trainer(trainer: Trainer) -> AppResult<PathBuf> {
-    trainer_service::download_trainer(trainer).await
+pub async fn download_trainer<R: Runtime>(
+    app_handle: tauri::AppHandle<R>,
+    trainer: Trainer,
+) -> AppResult<PathBuf> {
+    trainer_service::download_trainer(app_handle, trainer).await
 }
 
 #[tauri::command]
@@ -39,4 +54,4 @@ pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
 #[tauri::command]
 pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
     trainer_service::launch_trainer(trainer_id).await
-} 
+}

@@ -1,6 +1,6 @@
+use crate::api::error::{AppError, AppResult};
 use directories::ProjectDirs;
 use std::path::PathBuf;
-use crate::api::error::{AppError, AppResult};
 
 pub fn get_app_dir() -> AppResult<PathBuf> {
     ProjectDirs::from("com", "trainer", "manager")
@@ -17,7 +17,7 @@ pub fn sanitize_filename(filename: &str) -> String {
     let invalid_chars = [
         '<', '>', ':', '"', '/', '\\', '|', '?', '*', '\0', '\n', '\r', '\t',
     ];
-    
+
     let mut safe_name = filename
         .chars()
         .map(|c| {
@@ -37,9 +37,8 @@ pub fn sanitize_filename(filename: &str) -> String {
 
     // Windows 保留文件名检查
     let reserved_names = [
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
-        "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4",
-        "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     ];
 
     if reserved_names.contains(&safe_name.to_uppercase().as_str()) {
@@ -59,4 +58,4 @@ pub fn sanitize_filename(filename: &str) -> String {
     safe_name
         .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
         .to_string()
-} 
+}

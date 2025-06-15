@@ -1,5 +1,7 @@
-use thiserror::Error;
+use chrono::Local;
+use log::{debug, error, warn};
 use serde::{Serialize, Serializer};
+use thiserror::Error;
 use zip::result::ZipError;
 
 // 错误代码枚举，便于前端进行错误处理
@@ -64,6 +66,18 @@ pub enum AppError {
 #[derive(Debug, Clone)]
 pub struct ErrorDetails {
     pub custom_message: Option<String>,
+    pub time: String,
+    pub source: Option<String>,
+}
+
+impl Default for ErrorDetails {
+    fn default() -> Self {
+        Self {
+            custom_message: None,
+            time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            source: None,
+        }
+    }
 }
 
 impl AppError {
@@ -87,11 +101,14 @@ impl AppError {
 
     // 添加自定义错误详细信息
     pub fn with_details(self, details: &str) -> Self {
+        // 记录错误详情
+        error!("[错误详情] {}: {}", self, details);
+
         match self {
-            AppError::ZipError(e) => {
+            AppError::ZipError(_) => {
                 // 对于ZIP错误，返回一个新的下载错误，带有自定义消息
                 AppError::DownloadError(details.to_string())
-            },
+            }
             _ => self, // 其他错误类型暂时不处理
         }
     }
@@ -113,6 +130,40 @@ impl AppError {
             AppError::UnknownError(_) => "发生未知错误，请尝试重启应用程序".to_string(),
         }
     }
+
+    // 记录错误日志
+    pub fn log(&self, source: Option<&str>) {
+        let error_code = self.error_code() as i32;
+        let source_str = source.unwrap_or("未知来源");
+        error!(
+            "[错误] 代码: {}, 来源: {}, 消息: {}",
+            error_code, source_str, self
+        );
+
+        // 对于特定错误类型添加更多信息
+        match self {
+            AppError::RequestError(e) => {
+                if e.is_timeout() {
+                    warn!("[网络超时] 请求超时: {}", e);
+                }
+                if e.is_connect() {
+                    warn!("[网络连接] 连接失败: {}", e);
+                }
+            }
+            AppError::IoError(e) => {
+                warn!("[IO错误] 类型: {:?}, 消息: {}", e.kind(), e);
+            }
+            _ => {}
+        }
+    }
+}
+
+// 在错误转换为结果之前记录日志的辅助函数
+pub fn log_error<T>(result: AppResult<T>, source: &str) -> AppResult<T> {
+    if let Err(ref e) = result {
+        e.log(Some(source));
+    }
+    result
 }
 
 // 用于序列化的错误响应结构
@@ -121,6 +172,7 @@ struct ErrorResponse {
     code: ErrorCode,
     message: String,
     details: String,
+    timestamp: String,
 }
 
 impl Serialize for AppError {
@@ -128,10 +180,14 @@ impl Serialize for AppError {
     where
         S: Serializer,
     {
+        // 记录错误
+        self.log(None);
+
         let response = ErrorResponse {
             code: self.error_code(),
             message: self.user_message(),
             details: self.to_string(),
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         };
         response.serialize(serializer)
     }

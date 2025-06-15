@@ -122,7 +122,9 @@ dependencies = [
  "chrono",
  "directories",
  "futures-util",
+ "lazy_static",
  "log",
+ "regex",
  "reqwest",
  "scraper",
  "serde",
@@ -133,6 +135,7 @@ dependencies = [
  "tauri-plugin-store",
  "thiserror 1.0.69",
  "tokio",
+ "url",
  "windows-sys 0.52.0",
  "zip",
 ]

@@ -12,7 +12,6 @@ use std::io::Read;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use tauri::Emitter;
-use tauri::Manager;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 #[cfg(target_os = "windows")]

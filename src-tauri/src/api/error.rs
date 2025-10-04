@@ -1,5 +1,5 @@
 use chrono::Local;
-use log::{debug, error, warn};
+use log::{error, warn};
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 use zip::result::ZipError;
@@ -63,6 +63,7 @@ pub enum AppError {
 }
 
 // 错误详细信息
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ErrorDetails {
     pub custom_message: Option<String>,
@@ -100,6 +101,7 @@ impl AppError {
     }
 
     // 添加自定义错误详细信息
+    #[allow(dead_code)]
     pub fn with_details(self, details: &str) -> Self {
         // 记录错误详情
         error!("[错误详情] {}: {}", self, details);
@@ -159,6 +161,7 @@ impl AppError {
 }
 
 // 在错误转换为结果之前记录日志的辅助函数
+#[allow(dead_code)]
 pub fn log_error<T>(result: AppResult<T>, source: &str) -> AppResult<T> {
     if let Err(ref e) = result {
         e.log(Some(source));

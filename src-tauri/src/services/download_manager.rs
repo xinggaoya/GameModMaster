@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
-use tauri::Manager;
 
 // 下载管理器状态
 lazy_static! {

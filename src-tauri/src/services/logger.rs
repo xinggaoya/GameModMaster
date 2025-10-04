@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 // 日志级别
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum LogLevel {
     Debug,
@@ -29,6 +30,7 @@ impl std::fmt::Display for LogLevel {
 
 // 日志配置
 pub struct LogConfig {
+    #[allow(dead_code)]
     pub max_log_size: u64,    // 最大日志大小（字节）
     pub max_log_files: usize, // 最大日志文件数量
     pub log_dir: PathBuf,     // 日志目录

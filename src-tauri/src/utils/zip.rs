@@ -5,6 +5,7 @@ use zip::ZipArchive;
 use crate::api::error::{AppError, AppResult};
 
 // 验证ZIP文件是否有效
+#[allow(dead_code)]
 pub fn validate_zip(zip_path: &PathBuf) -> AppResult<()> {
     // 尝试打开文件
     let file = File::open(zip_path)?;

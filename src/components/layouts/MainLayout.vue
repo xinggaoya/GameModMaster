@@ -10,14 +10,15 @@ import {
   NSpace,
   NIcon,
   NAvatar,
-  NTabs,
-  NTab,
   NBadge,
   NDivider,
   NTooltip,
   NDropdown,
-  NMenu,
   NSwitch,
+  NInput,
+  NGrid,
+  NGridItem,
+  NCard,
 } from 'naive-ui'
 import {
   HomeOutline,
@@ -32,42 +33,72 @@ import {
   LogOutOutline,
   PersonOutline,
   SearchOutline,
-  ChevronForwardOutline,
-  BriefcaseOutline,
+  SparklesOutline,
+  GridOutline,
+  HeartOutline,
+  TrophyOutline,
 } from '@vicons/ionicons5'
 
 const router = useRouter()
 const route = useRoute()
 
-// 侧边栏折叠状态
+// 状态管理
 const collapsed = ref(false)
-const isDark = ref(false) // 默认关闭暗黑模式
+const isDark = ref(false)
+const searchQuery = ref('')
+const isSearchFocused = ref(false)
 
-// 标签页配置
-const tabs = [
+// 导航配置 - 采用更现代的分类方式
+const navigationItems = [
   {
-    name: '/',
-    label: '发现',
-    icon: HomeOutline,
-    tooltip: '浏览和发现游戏修改器',
+    title: '探索',
+    items: [
+      {
+        name: '/',
+        label: '发现',
+        icon: SparklesOutline,
+        tooltip: '探索热门修改器',
+        color: '#7c3aed',
+      },
+      {
+        name: '/games',
+        label: '游戏库',
+        icon: GameControllerOutline,
+        tooltip: '按游戏分类浏览',
+        color: '#0891b2',
+      },
+    ],
   },
   {
-    name: '/downloads',
-    label: '我的收藏',
-    icon: DownloadOutline,
-    tooltip: '管理已下载的修改器',
+    title: '管理',
+    items: [
+      {
+        name: '/downloads',
+        label: '我的收藏',
+        icon: HeartOutline,
+        tooltip: '管理已下载内容',
+        color: '#dc2626',
+      },
+      {
+        name: '/achievements',
+        label: '成就',
+        icon: TrophyOutline,
+        tooltip: '查看使用成就',
+        color: '#ea580c',
+      },
+    ],
   },
   {
-    name: '/games',
-    label: '游戏库',
-    icon: GameControllerOutline,
-    tooltip: '按游戏浏览修改器',
-  },
-  {
-    name: '/about',
-    label: '关于',
-    icon: InformationCircleOutline,
-    tooltip: '关于软件',
+    title: '系统',
+    items: [
+      {
+        name: '/about',
+        label: '关于',
+        icon: InformationCircleOutline,
+        tooltip: '应用信息',
+        color: '#6b7280',
+      },
+    ],
   },
 ]
 
@@ -97,31 +128,37 @@ const userMenuOptions = [
 // 通知菜单选项
 const notificationMenuOptions = [
   {
-    label: '新版本可用 (v1.2.0)',
+    label: '新版本可用',
     key: 'update',
     icon: () => h(NIcon, null, { default: () => h(DownloadOutline) }),
   },
   {
-    label: '欢迎使用游戏修改器管理中心',
+    label: '欢迎使用',
     key: 'welcome',
     icon: () => h(NIcon, null, { default: () => h(HomeOutline) }),
   },
 ]
 
-// 当前激活的标签页
-const activeTab = computed(() => route.path)
+// 当前激活的页面
+const currentPage = computed(() => route.path)
 
-// 处理标签页切换
-const handleTabChange = (name: string) => {
+// 处理导航
+const handleNavigation = (name: string) => {
   router.push(name)
+}
+
+// 处理搜索
+const handleSearch = () => {
+  if (searchQuery.value.trim()) {
+    // 实现搜索逻辑
+    console.log('搜索:', searchQuery.value)
+  }
 }
 
 // 切换主题
 const toggleTheme = () => {
   isDark.value = !isDark.value
-  // 保存主题设置到本地存储
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
-  // 更新文档根元素的类名
   if (isDark.value) {
     document.documentElement.classList.add('dark-theme')
   } else {
@@ -131,8 +168,11 @@ const toggleTheme = () => {
 
 // 获取页面标题
 const pageTitle = computed(() => {
-  const currentTab = tabs.find((tab) => tab.name === route.path)
-  return currentTab?.label || '游戏修改器中心'
+  for (const section of navigationItems) {
+    const item = section.items.find(item => item.name === route.path)
+    if (item) return item.label
+  }
+  return 'Game Mod Master'
 })
 
 // 处理用户菜单
@@ -142,15 +182,11 @@ const handleUserMenuSelect = (key: string) => {
   } else if (key === 'profile') {
     router.push('/profile')
   } else if (key === 'logout') {
-    // 处理退出登录
     console.log('退出登录')
   }
 }
 
-// 假设有3个新通知
-const notificationCount = ref(3)
-
-// 在组件挂载时初始化主题
+// 组件挂载时初始化
 onMounted(() => {
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme) {
@@ -164,70 +200,97 @@ onMounted(() => {
 
 <template>
   <NLayout class="main-layout" has-sider position="absolute">
-    <!-- 侧边栏 -->
+    <!-- 现代化侧边栏 -->
     <NLayoutSider
       :collapsed="collapsed"
-      :collapsed-width="70"
-      :width="240"
+      :collapsed-width="80"
+      :width="280"
       show-trigger
       collapse-mode="width"
       @collapse="collapsed = true"
       @expand="collapsed = false"
       :native-scrollbar="false"
-      class="main-sider animate-slide-in"
+      class="modern-sider"
       bordered
     >
-      <!-- Logo -->
-      <div class="logo-container">
-        <router-link to="/" class="logo-link">
-          <img src="/src/assets/logo.png" alt="Logo" class="logo" v-if="!collapsed" />
-          <img src="/src/assets/logo-small.png" alt="Logo" class="logo-small" v-else />
-          <h1 class="logo-text game-title" v-if="!collapsed">GameMod</h1>
+      <!-- 品牌区域 -->
+      <div class="brand-section">
+        <router-link to="/" class="brand-link">
+          <div class="brand-logo">
+            <div class="logo-icon">
+              <NIcon size="32">
+                <GridOutline />
+              </NIcon>
+            </div>
+            <transition name="fade">
+              <div v-show="!collapsed" class="brand-text">
+                <h1 class="brand-title">Game Mod</h1>
+                <p class="brand-subtitle">Master</p>
+              </div>
+            </transition>
+          </div>
         </router-link>
       </div>
 
-      <!-- 导航菜单 -->
-      <div class="nav-container">
-        <div v-for="tab in tabs" :key="tab.name" class="nav-item">
-          <NTooltip v-if="collapsed" placement="right" trigger="hover">
-            <template #trigger>
-              <NButton
-                :quaternary="activeTab !== tab.name"
-                :secondary="activeTab === tab.name"
-                circle
-                size="large"
-                class="nav-button"
-                @click="handleTabChange(tab.name)"
-              >
-                <NIcon :class="{ active: activeTab === tab.name }">
-                  <component :is="tab.icon" />
-                </NIcon>
-              </NButton>
-            </template>
-            {{ tab.tooltip }}
-          </NTooltip>
+      <!-- 现代化导航 -->
+      <div class="navigation-container">
+        <div v-for="section in navigationItems" :key="section.title" class="nav-section">
+          <transition name="fade">
+            <h3 v-show="!collapsed" class="section-title">{{ section.title }}</h3>
+          </transition>
 
-          <NButton
-            v-else
-            :quaternary="activeTab !== tab.name"
-            :secondary="activeTab === tab.name"
-            class="nav-button full-width"
-            @click="handleTabChange(tab.name)"
-          >
-            <template #icon>
-              <NIcon :class="{ active: activeTab === tab.name }">
-                <component :is="tab.icon" />
-              </NIcon>
-            </template>
-            {{ tab.label }}
-          </NButton>
+          <div class="nav-items">
+            <div v-for="item in section.items" :key="item.name" class="nav-item-wrapper">
+              <NTooltip v-if="collapsed" placement="right" trigger="hover">
+                <template #trigger>
+                  <NButton
+                    :type="currentPage === item.name ? 'primary' : 'default'"
+                    circle
+                    size="large"
+                    class="modern-nav-button"
+                    @click="handleNavigation(item.name)"
+                    :style="{
+                      background: currentPage === item.name ? `${item.color}15` : 'transparent',
+                      borderColor: currentPage === item.name ? item.color : 'transparent'
+                    }"
+                  >
+                    <NIcon :style="{ color: currentPage === item.name ? item.color : 'inherit' }">
+                      <component :is="item.icon" />
+                    </NIcon>
+                  </NButton>
+                </template>
+                {{ item.tooltip }}
+              </NTooltip>
+
+              <NButton
+                v-else
+                :type="currentPage === item.name ? 'primary' : 'default'"
+                class="modern-nav-button expanded"
+                @click="handleNavigation(item.name)"
+                :style="{
+                  background: currentPage === item.name ? `${item.color}15` : 'transparent',
+                  borderColor: currentPage === item.name ? item.color : 'transparent',
+                  justifyContent: 'flex-start'
+                }"
+              >
+                <template #icon>
+                  <NIcon :style="{ color: currentPage === item.name ? item.color : 'inherit' }">
+                    <component :is="item.icon" />
+                  </NIcon>
+                </template>
+                <span class="nav-label">{{ item.label }}</span>
+              </NButton>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- 底部操作区 -->
-      <div class="sider-footer">
+      <!-- 底部控制区 -->
+      <div class="bottom-controls">
         <NDivider v-if="!collapsed" />
-        <div class="footer-actions">
+
+        <!-- 主题切换 -->
+        <div class="theme-control">
           <NTooltip v-if="collapsed" placement="right" trigger="hover">
             <template #trigger>
               <NButton circle quaternary size="large" @click="toggleTheme">
@@ -240,79 +303,93 @@ onMounted(() => {
             {{ isDark ? '切换至亮色模式' : '切换至暗色模式' }}
           </NTooltip>
 
-          <div v-else class="theme-switch">
-            <NIcon><SunnyOutline /></NIcon>
-            <NSwitch size="medium" v-model:value="isDark" @update:value="toggleTheme" />
-            <NIcon><MoonOutline /></NIcon>
+          <div v-else class="theme-switcher">
+            <NIcon size="18"><SunnyOutline /></NIcon>
+            <NSwitch v-model:value="isDark" @update:value="toggleTheme" />
+            <NIcon size="18"><MoonOutline /></NIcon>
           </div>
         </div>
       </div>
     </NLayoutSider>
 
-    <!-- 主内容区 -->
+    <!-- 主内容区域 -->
     <NLayout class="content-wrapper">
-      <!-- 顶部栏 -->
-      <NLayoutHeader bordered class="main-header animate-fade">
-        <div class="header-left">
-          <NButton quaternary circle class="collapse-button" @click="collapsed = !collapsed">
-            <NIcon><MenuOutline /></NIcon>
-          </NButton>
-
-          <div class="search-container">
-            <NButton quaternary circle>
-              <NIcon><SearchOutline /></NIcon>
+      <!-- 现代化顶部栏 -->
+      <NLayoutHeader class="modern-header" bordered>
+        <div class="header-content">
+          <!-- 左侧：折叠按钮和搜索 -->
+          <div class="header-left">
+            <NButton quaternary circle size="large" class="collapse-btn" @click="collapsed = !collapsed">
+              <NIcon size="20">
+                <MenuOutline />
+              </NIcon>
             </NButton>
-            <span class="search-placeholder">搜索游戏或修改器...</span>
+
+            <!-- 现代化搜索框 -->
+            <div class="modern-search" :class="{ focused: isSearchFocused }">
+              <NInput
+                v-model:value="searchQuery"
+                placeholder="搜索修改器、游戏..."
+                size="large"
+                class="search-input"
+                @focus="isSearchFocused = true"
+                @blur="isSearchFocused = false"
+                @keydown.enter="handleSearch"
+              >
+                <template #prefix>
+                  <NIcon class="search-icon">
+                    <SearchOutline />
+                  </NIcon>
+                </template>
+              </NInput>
+            </div>
           </div>
-        </div>
 
-        <div class="page-title-container">
-          <h2 class="page-title">{{ pageTitle }}</h2>
-        </div>
+          <!-- 中间：页面标题 -->
+          <div class="header-center">
+            <h1 class="page-title">{{ pageTitle }}</h1>
+          </div>
 
-        <div class="header-right">
-          <!-- 通知菜单 -->
-          <NDropdown :options="notificationMenuOptions" placement="bottom-end" trigger="click">
-            <NBadge :value="3" :max="99" :show-zero="false" dot>
-              <NButton quaternary circle>
-                <NIcon><NotificationsOutline /></NIcon>
+          <!-- 右侧：操作按钮 -->
+          <div class="header-right">
+            <!-- 通知 -->
+            <NDropdown :options="notificationMenuOptions" placement="bottom-end" trigger="click">
+              <NBadge :value="2" :max="99" :show-zero="false" dot>
+                <NButton quaternary circle size="large" class="action-btn">
+                  <NIcon size="20">
+                    <NotificationsOutline />
+                  </NIcon>
+                </NButton>
+              </NBadge>
+            </NDropdown>
+
+            <!-- 用户菜单 -->
+            <NDropdown
+              :options="userMenuOptions"
+              placement="bottom-end"
+              trigger="click"
+              @select="handleUserMenuSelect"
+            >
+              <NButton text class="user-profile">
+                <NAvatar
+                  round
+                  size="small"
+                  src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
+                  class="user-avatar"
+                />
+                <transition name="fade">
+                  <span v-show="!collapsed" class="user-name">用户</span>
+                </transition>
               </NButton>
-            </NBadge>
-          </NDropdown>
-
-          <!-- 主题切换 - 在侧边栏折叠时显示 -->
-          <NButton v-if="collapsed" quaternary circle @click="toggleTheme">
-            <NIcon>
-              <MoonOutline v-if="isDark" />
-              <SunnyOutline v-else />
-            </NIcon>
-          </NButton>
-
-          <!-- 用户菜单 -->
-          <NDropdown
-            :options="userMenuOptions"
-            placement="bottom-end"
-            trigger="click"
-            @select="handleUserMenuSelect"
-          >
-            <NButton text class="user-button">
-              <NAvatar
-                round
-                size="small"
-                src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
-                class="user-avatar"
-              />
-              <span class="username" v-if="!collapsed">用户名</span>
-              <NIcon class="dropdown-icon"><ChevronForwardOutline /></NIcon>
-            </NButton>
-          </NDropdown>
+            </NDropdown>
+          </div>
         </div>
       </NLayoutHeader>
 
-      <!-- 内容区 -->
-      <NLayoutContent class="main-content animate-fade">
+      <!-- 内容区域 -->
+      <NLayoutContent class="modern-content">
         <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
+          <transition name="page-transition" mode="out-in">
             <component :is="Component" />
           </transition>
         </router-view>
@@ -322,264 +399,490 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 全局布局 */
 .main-layout {
   height: 100vh;
-  background-color: var(--body-color);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
 }
 
-.main-sider {
-  background: var(--card-color);
-  border-right: 1px solid var(--divider-color);
-  box-shadow: var(--shadow-sm);
+/* 背景装饰元素 */
+.main-layout::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: backgroundMove 20s linear infinite;
+  z-index: 0;
+}
+
+@keyframes backgroundMove {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(-50px, -50px) rotate(360deg); }
+}
+
+/* 现代化侧边栏 */
+.modern-sider {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 100;
+  position: relative;
 }
 
-.logo-container {
-  height: 70px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid var(--divider-color);
+/* 品牌区域 */
+.brand-section {
+  padding: 2rem 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(8, 145, 178, 0.1) 100%);
 }
 
-.logo-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.brand-link {
   text-decoration: none;
-  width: 100%;
-  justify-content: center;
+  display: block;
 }
 
-.logo {
-  height: 32px;
-  object-fit: contain;
-}
-
-.logo-small {
-  height: 36px;
-  width: 36px;
-  object-fit: contain;
-}
-
-.logo-text {
-  font-size: 1.2rem;
-  margin: 0;
-  font-weight: 700;
-}
-
-.nav-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 12px;
+.brand-logo {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.3s ease;
 }
 
-.nav-item {
-  width: 100%;
-}
-
-.nav-button {
-  font-size: 1rem;
-  transition: all 0.2s ease;
-  height: 46px;
-}
-
-.nav-button.full-width {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0 12px;
-  border-radius: var(--radius-lg);
-}
-
-.nav-button:hover {
-  background-color: var(--hover-color);
+.brand-logo:hover {
   transform: translateY(-2px);
 }
 
-.nav-button :deep(.n-icon) {
-  font-size: 1.2rem;
-  margin-right: 12px;
-  color: var(--text-tertiary);
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #7c3aed 0%, #0891b2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
 }
 
-.nav-button :deep(.n-icon.active) {
-  color: var(--primary);
+.brand-text {
+  flex: 1;
 }
 
-.sider-footer {
-  padding: 16px;
-  margin-top: auto;
+.brand-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #7c3aed 0%, #0891b2 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
 }
 
-.footer-actions {
+.brand-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* 导航区域 */
+.navigation-container {
+  flex: 1;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+
+.nav-section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem 0.75rem;
+}
+
+.nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-item-wrapper {
+  position: relative;
+}
+
+.modern-nav-button {
+  height: 48px !important;
+  border-radius: 16px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: 2px solid transparent !important;
+  font-weight: 600 !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.modern-nav-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.5s ease;
+}
+
+.modern-nav-button:hover::before {
+  left: 100%;
+}
+
+.modern-nav-button:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.modern-nav-button.expanded {
+  width: 100%;
+  padding: 0 1.25rem !important;
+}
+
+.nav-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* 底部控制区 */
+.bottom-controls {
+  padding: 1.5rem 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.theme-control {
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 12px 0;
 }
 
-.theme-switch {
+.theme-switcher {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text-tertiary);
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* 主内容区域 */
 .content-wrapper {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-.main-header {
-  height: 70px;
-  padding: 0 24px;
-  background: var(--card-color);
+/* 现代化顶部栏 */
+.modern-header {
+  height: 80px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  z-index: 90;
+  position: relative;
+}
+
+.header-content {
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: var(--shadow-sm);
-  z-index: 90;
+  padding: 0 2rem;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 1.5rem;
+  flex: 1;
 }
 
-.collapse-button:hover {
-  background-color: var(--hover-color);
+.collapse-btn {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
 }
 
-.search-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border-radius: var(--radius-full);
-  background-color: var(--hover-color);
-  height: 40px;
-  transition: all 0.2s ease;
-  cursor: pointer;
+.collapse-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
-.search-container:hover {
-  background-color: var(--gray-200);
+/* 现代化搜索框 */
+.modern-search {
+  position: relative;
+  max-width: 400px;
+  flex: 1;
+  transition: all 0.3s ease;
 }
 
-.search-placeholder {
-  color: var(--text-tertiary);
-  font-size: 0.9rem;
+.modern-search.focused {
+  transform: scale(1.02);
 }
 
-.page-title-container {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+.search-input {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px !important;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.search-input:focus-within {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1), 0 8px 25px rgba(124, 58, 237, 0.15);
+  transform: translateY(-2px);
+}
+
+.search-icon {
+  color: #9ca3af;
+  transition: color 0.3s ease;
+}
+
+.search-input:focus-within .search-icon {
+  color: #7c3aed;
+}
+
+.header-center {
+  flex: 0 0 auto;
+  padding: 0 2rem;
 }
 
 .page-title {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #7c3aed 0%, #0891b2 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 1rem;
+  flex: 1;
+  justify-content: flex-end;
 }
 
-.user-button {
+.action-btn {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-2px) rotate(5deg);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.user-profile {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 8px;
-  border-radius: var(--radius-full);
-  transition: all 0.2s ease;
-  background-color: var(--hover-color);
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50px;
+  transition: all 0.3s ease;
+  text-decoration: none;
 }
 
-.user-button:hover {
-  background-color: var(--gray-200);
+.user-profile:hover {
+  background: rgba(255, 255, 255, 1);
   transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
 .user-avatar {
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 2px solid white;
 }
 
-.username {
+.user-name {
+  font-weight: 600;
+  color: #374151;
   font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-secondary);
 }
 
-.dropdown-icon {
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-  transition: transform 0.2s ease;
-}
-
-.user-button:hover .dropdown-icon {
-  transform: rotate(90deg);
-}
-
-.main-content {
-  padding: 24px;
-  overflow-y: auto;
+/* 现代化内容区域 */
+.modern-content {
   flex: 1;
-  background-color: var(--body-color);
+  padding: 2rem;
+  overflow-y: auto;
+  background: rgba(248, 250, 252, 0.5);
+  position: relative;
+}
+
+.modern-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.2), transparent);
 }
 
 /* 过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+  transform: translateX(-20px);
+}
+
+.page-transition-enter-active,
+.page-transition-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-transition-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(1.05);
 }
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .header-content {
+    padding: 0 1.5rem;
+  }
+
+  .modern-search {
+    max-width: 300px;
+  }
+}
+
 @media (max-width: 768px) {
-  .main-sider {
+  .modern-sider {
     position: fixed;
     height: 100vh;
     z-index: 1000;
   }
 
-  .page-title-container {
-    position: static;
-    transform: none;
+  .header-center {
+    display: none;
+  }
+
+  .modern-search {
+    display: none;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .header-content {
+    padding: 0 1rem;
+  }
+
+  .modern-content {
+    padding: 1rem;
   }
 
   .page-title {
-    font-size: 1rem;
+    font-size: 1.25rem;
   }
+}
 
-  .main-content {
-    padding: 16px;
-  }
+/* 暗色主题 */
+:deep(.dark-theme) .main-layout {
+  background: linear-gradient(135deg, #1e1b4b 0%, #1e293b 100%);
+}
 
-  .search-container {
-    display: none;
-  }
+:deep(.dark-theme) .modern-sider {
+  background: rgba(30, 41, 59, 0.95);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
 
-  .username {
-    display: none;
-  }
+:deep(.dark-theme) .brand-section {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(8, 145, 178, 0.2) 100%);
+}
+
+:deep(.dark-theme) .modern-header {
+  background: rgba(30, 41, 59, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark-theme) .content-wrapper {
+  background: rgba(15, 23, 42, 0.9);
+}
+
+:deep(.dark-theme) .modern-content {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+:deep(.dark-theme) .search-input {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark-theme) .collapse-btn,
+:deep(.dark-theme) .action-btn,
+:deep(.dark-theme) .user-profile {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.dark-theme) .page-title {
+  background: linear-gradient(135deg, #a78bfa 0%, #67e8f9 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+:deep(.dark-theme) .user-name {
+  color: #e2e8f0;
+}
+
+:deep(.dark-theme) .theme-switcher {
+  background: rgba(30, 41, 59, 0.8);
 }
 </style>

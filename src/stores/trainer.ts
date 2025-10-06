@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { MessageApi } from 'naive-ui'
 import type { Trainer, InstalledTrainer } from '../types'
 import { handleError } from '../utils/errorHandler'
+import { StorageService, withRetry } from '../services/storageService'
 
 // 缓存配置
 const CACHE_CONFIG = {
@@ -15,143 +16,10 @@ const CACHE_CONFIG = {
   retryDelay: 1000,
 }
 
-// 缓存项接口
-interface CacheItem<T> {
-  data: T
-  timestamp: number
-  expiration: number
-}
-
-// 本地存储键名
-const STORAGE_KEY = {
-  installed: 'installedTrainers',
-  downloaded: 'downloadedTrainers',
-  trainerList: 'trainerList',
-  searchResults: 'searchResults',
-}
-
-// 保存数据到本地存储
-const saveToStorage = {
-  installed: (data: InstalledTrainer[]) => {
-    localStorage.setItem(STORAGE_KEY.installed, JSON.stringify(data))
-  },
-  downloaded: (data: Trainer[]) => {
-    localStorage.setItem(STORAGE_KEY.downloaded, JSON.stringify(data))
-  },
-  // 新增：缓存修改器列表
-  trainerList: (data: Trainer[], page: number, timestamp: number = Date.now()) => {
-    const cacheItem: CacheItem<Trainer[]> = {
-      data,
-      timestamp,
-      expiration: timestamp + CACHE_CONFIG.expirationTime,
-    }
-    localStorage.setItem(`${STORAGE_KEY.trainerList}_${page}`, JSON.stringify(cacheItem))
-  },
-  // 新增：缓存搜索结果
-  searchResults: (data: Trainer[], query: string, page: number, timestamp: number = Date.now()) => {
-    const cacheItem: CacheItem<Trainer[]> = {
-      data,
-      timestamp,
-      expiration: timestamp + CACHE_CONFIG.expirationTime,
-    }
-    localStorage.setItem(`${STORAGE_KEY.searchResults}_${query}_${page}`, JSON.stringify(cacheItem))
-  },
-}
-
-// 从本地存储加载数据
-const loadFromStorage = {
-  installed: (): InstalledTrainer[] => {
-    const data = localStorage.getItem(STORAGE_KEY.installed)
-    return data ? JSON.parse(data) : []
-  },
-  downloaded: (): Trainer[] => {
-    const data = localStorage.getItem(STORAGE_KEY.downloaded)
-    return data ? JSON.parse(data) : []
-  },
-  // 新增：加载修改器列表缓存
-  trainerList: (page: number): CacheItem<Trainer[]> | null => {
-    const data = localStorage.getItem(`${STORAGE_KEY.trainerList}_${page}`)
-    if (!data) return null
-
-    const cacheItem: CacheItem<Trainer[]> = JSON.parse(data)
-    // 检查是否过期
-    if (cacheItem.expiration < Date.now()) {
-      return null // 缓存已过期
-    }
-
-    return cacheItem
-  },
-  // 新增：加载搜索结果缓存
-  searchResults: (query: string, page: number): CacheItem<Trainer[]> | null => {
-    const data = localStorage.getItem(`${STORAGE_KEY.searchResults}_${query}_${page}`)
-    if (!data) return null
-
-    const cacheItem: CacheItem<Trainer[]> = JSON.parse(data)
-    // 检查是否过期
-    if (cacheItem.expiration < Date.now()) {
-      return null // 缓存已过期
-    }
-
-    return cacheItem
-  },
-}
-
-// 清除过期缓存
-const cleanExpiredCache = () => {
-  const now = Date.now()
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (!key) continue
-
-    // 只清理我们的缓存项
-    if (key.startsWith(STORAGE_KEY.trainerList) || key.startsWith(STORAGE_KEY.searchResults)) {
-      try {
-        const data = localStorage.getItem(key)
-        if (data) {
-          const cacheItem: CacheItem<Trainer[]> = JSON.parse(data)
-          if (cacheItem.expiration < now) {
-            localStorage.removeItem(key)
-          }
-        }
-      } catch (e) {
-        console.error('无效的缓存项:', key, e)
-        // 删除无效的缓存项
-        localStorage.removeItem(key)
-      }
-    }
-  }
-}
-
 declare global {
   interface Window {
     $message: MessageApi
   }
-}
-
-// 异步操作重试包装器
-const withRetry = async <T>(
-  operation: () => Promise<T>,
-  maxRetries: number = CACHE_CONFIG.maxRetries,
-  delay: number = CACHE_CONFIG.retryDelay,
-): Promise<T> => {
-  let lastError: Error | unknown = null
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation()
-    } catch (err) {
-      lastError = err
-      console.warn(`操作失败 (尝试 ${attempt}/${maxRetries})`, err)
-
-      if (attempt < maxRetries) {
-        // 等待一段时间后重试
-        await new Promise((resolve) => setTimeout(resolve, delay * attempt))
-      }
-    }
-  }
-
-  throw lastError
 }
 
 export const useTrainerStore = defineStore('trainer', () => {
@@ -165,6 +33,7 @@ export const useTrainerStore = defineStore('trainer', () => {
   const currentPage = ref(1)
   const totalPages = ref(1)
   const lastUpdated = ref(Date.now()) // 上次更新时间
+  const isStorageMigrated = ref(StorageService.isMigrated()) // 存储迁移状态
 
   // 计算属性
   const recentlyInstalledTrainers = computed(() => {
@@ -190,16 +59,32 @@ export const useTrainerStore = defineStore('trainer', () => {
     try {
       isLoading.value = true
       error.value = null
-      // 从本地存储加载数据
-      installedTrainers.value = loadFromStorage.installed()
-      downloadedTrainers.value = loadFromStorage.downloaded()
-      console.log('Store: 已加载本地数据:', {
+
+      // 首先检查并执行存储迁移
+      if (!isStorageMigrated.value) {
+        console.log('Store: 开始存储迁移')
+        await StorageService.migrateFromLocalStorage()
+        isStorageMigrated.value = true
+        console.log('Store: 存储迁移完成')
+      }
+
+      // 从新存储加载数据
+      const [installed, downloaded] = await Promise.all([
+        StorageService.getInstalledTrainers(),
+        StorageService.getDownloadedTrainers()
+      ])
+      
+      installedTrainers.value = installed
+      downloadedTrainers.value = downloaded
+      
+      console.log('Store: 已加载数据:', {
         installed: installedTrainers.value.length,
         downloaded: downloadedTrainers.value.length,
+        migrated: isStorageMigrated.value,
       })
 
       // 清理过期缓存
-      cleanExpiredCache()
+      await StorageService.cleanExpiredCache()
 
       // 初始加载修改器列表
       await fetchTrainers(1)
@@ -233,15 +118,15 @@ export const useTrainerStore = defineStore('trainer', () => {
       const now = new Date().toISOString()
       const trainerWithMeta: InstalledTrainer = {
         ...trainer,
-        installed_path: '', // 由于是本地存储，不需要实际路径
+        installed_path: '', // 后端存储，不需要实际路径
         install_time: now,
         last_launch_time: now,
       }
 
       // 添加到列表
       installedTrainers.value.push(trainerWithMeta)
-      // 保存到本地存储
-      saveToStorage.installed(installedTrainers.value)
+      // 保存到新存储
+      await StorageService.saveInstalledTrainers(installedTrainers.value)
 
       return true
     } catch (err) {
@@ -256,8 +141,8 @@ export const useTrainerStore = defineStore('trainer', () => {
     try {
       // 从列表中移除
       installedTrainers.value = installedTrainers.value.filter((t) => t.id !== trainerId)
-      // 更新本地存储
-      saveToStorage.installed(installedTrainers.value)
+      // 更新新存储
+      await StorageService.saveInstalledTrainers(installedTrainers.value)
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : '移除修改器失败'
@@ -280,8 +165,8 @@ export const useTrainerStore = defineStore('trainer', () => {
         ...trainer,
       }
 
-      // 保存到本地存储
-      saveToStorage.installed(installedTrainers.value)
+      // 保存到新存储
+      await StorageService.saveInstalledTrainers(installedTrainers.value)
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : '更新修改器失败'
@@ -304,8 +189,8 @@ export const useTrainerStore = defineStore('trainer', () => {
         last_launch_time: new Date().toISOString(),
       }
 
-      // 保存到本地存储
-      saveToStorage.installed(installedTrainers.value)
+      // 保存到新存储
+      await StorageService.saveInstalledTrainers(installedTrainers.value)
       return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : '更新启动时间失败'
@@ -332,10 +217,10 @@ export const useTrainerStore = defineStore('trainer', () => {
       currentPage.value = page
 
       // 检查缓存是否有效
-      const cachedData = loadFromStorage.trainerList(page)
+      const cachedData = await StorageService.getCachedTrainerList(page)
       if (cachedData) {
         console.log('Store: 使用缓存的修改器列表，页码:', page)
-        trainers.value = cachedData.data
+        trainers.value = cachedData
         // 估算总页数（假设每页20条记录）
         totalPages.value = Math.ceil(100 / 20) // 使用一个默认值
         return
@@ -354,7 +239,7 @@ export const useTrainerStore = defineStore('trainer', () => {
       totalPages.value = Math.ceil(response.total / 20)
 
       // 缓存结果
-      saveToStorage.trainerList(response.trainers, page)
+      await StorageService.cacheTrainerList(page, response.trainers)
 
       console.log('Store: 已获取修改器列表，页码:', page, '总数:', response.trainers.length)
     } catch (err) {
@@ -379,11 +264,11 @@ export const useTrainerStore = defineStore('trainer', () => {
       currentPage.value = page
 
       // 检查缓存是否有效
-      const cachedData = loadFromStorage.searchResults(query, page)
+      const cachedData = await StorageService.getCachedSearchResults(query, page)
       if (cachedData) {
         console.log('Store: 使用缓存的搜索结果，查询:', query, '页码:', page)
-        trainers.value = cachedData.data
-        totalPages.value = Math.ceil(cachedData.data.length / 20)
+        trainers.value = cachedData
+        totalPages.value = Math.ceil(cachedData.length / 20)
         return
       }
 
@@ -399,7 +284,7 @@ export const useTrainerStore = defineStore('trainer', () => {
       totalPages.value = Math.ceil(response.total / 20)
 
       // 缓存结果
-      saveToStorage.searchResults(response.trainers, query, page)
+      await StorageService.cacheSearchResults(query, page, response.trainers)
 
       console.log(
         'Store: 搜索完成，查询:',
@@ -438,7 +323,7 @@ export const useTrainerStore = defineStore('trainer', () => {
       const exists = downloadedTrainers.value.some((t) => t.id === trainer.id)
       if (!exists) {
         downloadedTrainers.value.push(trainer)
-        saveToStorage.downloaded(downloadedTrainers.value)
+        await StorageService.saveDownloadedTrainers(downloadedTrainers.value)
       }
 
       return result
@@ -455,7 +340,7 @@ export const useTrainerStore = defineStore('trainer', () => {
 
       // 从下载记录中删除
       downloadedTrainers.value = downloadedTrainers.value.filter((t) => t.id !== trainerId)
-      saveToStorage.downloaded(downloadedTrainers.value)
+      await StorageService.saveDownloadedTrainers(downloadedTrainers.value)
 
       return true
     } catch (err) {
@@ -486,6 +371,7 @@ export const useTrainerStore = defineStore('trainer', () => {
     currentPage,
     totalPages,
     lastUpdated,
+    isStorageMigrated,
 
     // 计算属性
     recentlyInstalledTrainers,
@@ -507,11 +393,15 @@ export const useTrainerStore = defineStore('trainer', () => {
     launchTrainer,
 
     // 缓存管理
-    cleanCache: cleanExpiredCache,
+    cleanCache: StorageService.cleanExpiredCache,
     refreshData: () => {
       // 强制刷新数据
       lastUpdated.value = Date.now()
       return fetchTrainers(currentPage.value)
     },
+
+    // 存储管理
+    resetMigration: StorageService.resetMigration,
+    clearAllStorage: StorageService.clearAllStorage,
   }
 })

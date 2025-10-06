@@ -20,3 +20,19 @@ pub struct TrainerInstallInfo {
     pub install_time: String,
     pub last_launch_time: Option<String>,
 } 
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InstalledTrainer {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub game_version: String,
+    pub download_url: String,
+    pub description: String,
+    pub thumbnail: String,
+    pub download_count: i32,
+    pub last_update: String,
+    pub installed_path: String,
+    pub install_time: String,
+    pub last_launch_time: String,
+} 

@@ -3,7 +3,8 @@ use crate::api::trainer::PaginatedResponse;
 use crate::models::trainer::{Trainer, TrainerInstallInfo};
 use crate::services::download_manager;
 use crate::services::scraper;
-use crate::utils::path::{get_downloads_dir, sanitize_filename};
+use crate::services::settings;
+use crate::utils::path::sanitize_filename;
 use crate::utils::zip::extract_zip;
 use chrono::Local;
 use std::fs;
@@ -57,7 +58,7 @@ pub async fn download_trainer<R: tauri::Runtime>(
         trainer.name, trainer.download_url
     );
 
-    let download_dir = get_downloads_dir()?;
+    let download_dir = settings::get_download_path()?;
     fs::create_dir_all(&download_dir)?;
 
     // 生成标准化的修改器目录名
@@ -217,7 +218,7 @@ fn is_exe_file(file_path: &PathBuf) -> bool {
 }
 
 pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
-    let download_dir = get_downloads_dir()?;
+    let download_dir = settings::get_download_path()?;
     let mut trainer_path = None;
     let mut executable_path = None;
 
@@ -334,7 +335,7 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
 }
 
 pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
-    let download_dir = get_downloads_dir()?;
+    let download_dir = settings::get_download_path()?;
 
     if let Ok(entries) = fs::read_dir(download_dir) {
         for entry in entries.flatten() {

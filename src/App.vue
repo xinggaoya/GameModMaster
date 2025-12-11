@@ -1,75 +1,75 @@
 <script setup lang="ts">
-import { ref, computed, h, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { darkTheme, NConfigProvider, NTabs, NTab, NIcon, NScrollbar } from 'naive-ui'
-import { Home, Download, InformationCircle } from '@vicons/ionicons5'
-import type { Component } from 'vue'
+import { darkTheme, NConfigProvider, NIcon, NScrollbar, NBadge, NTooltip } from 'naive-ui'
+import {
+  HomeOutline,
+  DownloadOutline,
+  SettingsOutline,
+  GameControllerOutline,
+  CloseOutline,
+  RemoveOutline,
+  SquareOutline,
+} from '@vicons/ionicons5'
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
-import WindowLayout from '@/components/layouts/WindowLayout.vue'
 import UpdateDialog from './components/update/UpdateDialog.vue'
+import { useTrainerStore } from './stores/trainer'
 import {
   checkForUpdates,
-  hasUpdate,
-  updateInfo,
   initUpdateListener,
   getAppVersion,
 } from './services/updaterService'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const router = useRouter()
 const route = useRoute()
+const store = useTrainerStore()
 const isDark = ref(false)
+const appWindow = getCurrentWindow()
 
 // 根据isDark的值返回主题
 const theme = computed(() => (isDark.value ? darkTheme : null))
 
-// 标签页配置
-const tabs = [
-  {
-    name: '/',
-    label: '首页',
-    icon: Home,
-  },
-  {
-    name: '/downloads',
-    label: '下载管理',
-    icon: Download,
-  },
+// 导航项
+const navItems = [
+  { path: '/', label: '探索', icon: HomeOutline },
+  { path: '/downloads', label: '收藏', icon: DownloadOutline, badge: () => store.downloadedTrainers.length },
+  { path: '/settings', label: '设置', icon: SettingsOutline },
 ]
 
-// 当前激活的标签页
-const activeTab = computed(() => route.path)
+// 当前激活的路由
+const currentPath = computed(() => route.path)
 
-// 处理标签页切换
-const handleTabChange = (name: string) => {
-  router.push(name)
+// 导航到指定路由
+const navigateTo = (path: string) => {
+  router.push(path)
 }
 
-// 用于更新对话框
+// 窗口控制
+const minimizeWindow = () => appWindow.minimize()
+const maximizeWindow = () => appWindow.toggleMaximize()
+const closeWindow = () => appWindow.close()
+
+// 更新对话框
 const showUpdateDialog = ref(false)
 const currentVersion = ref('')
 
-onMounted(() => {
+onMounted(async () => {
+  // 加载主题设置
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme) {
     isDark.value = savedTheme === 'dark'
   }
 
+  // 初始化 store
+  await store.initialize()
+
   // 初始化更新检查
-  initUpdateCheck()
-})
-
-// 初始化更新检查的函数
-const initUpdateCheck = async () => {
   try {
-    // 初始化更新监听器
     await initUpdateListener()
-
-    // 获取当前版本
     currentVersion.value = await getAppVersion()
 
-    // 自动检查更新（延迟5秒，避免影响应用启动）
     setTimeout(async () => {
-      console.log('自动检查更新...')
       const result = await checkForUpdates()
       if (result?.has_update) {
         showUpdateDialog.value = true
@@ -78,7 +78,7 @@ const initUpdateCheck = async () => {
   } catch (error) {
     console.error('自动检查更新失败:', error)
   }
-}
+})
 </script>
 
 <template>
@@ -89,39 +89,75 @@ const initUpdateCheck = async () => {
         <n-notification-provider>
           <n-loading-bar-provider>
             <n-dialog-provider>
-              <window-layout v-model:isDark="isDark">
-                <n-card class="app-main" content-style="padding: 0;">
-                  <NTabs
-                    v-model:value="activeTab"
-                    type="line"
-                    animated
-                    class="nav-tabs"
-                    @update:value="handleTabChange"
-                  >
-                    <NTab
-                      v-for="tab in tabs"
-                      :key="tab.name"
-                      :name="tab.name"
-                      :tab="
-                        () =>
-                          h('div', { class: 'tab-content' }, [
-                            h(NIcon, null, { default: () => h(tab.icon) }),
-                            h('span', { class: 'tab-label' }, tab.label),
-                          ])
-                      "
-                    />
-                  </NTabs>
-                  <div style="height: calc(100vh - 87px)">
-                    <n-scrollbar class="app-content" trigger="none">
-                      <router-view v-slot="{ Component }">
-                        <transition name="fade" mode="out-in">
-                          <component :is="Component" />
-                        </transition>
-                      </router-view>
-                    </n-scrollbar>
+              <div class="app-container" :class="{ dark: isDark }">
+                <!-- 自定义标题栏 -->
+                <header class="app-titlebar" data-tauri-drag-region>
+                  <div class="titlebar-left" data-tauri-drag-region>
+                    <NIcon size="20" class="app-logo">
+                      <GameControllerOutline />
+                    </NIcon>
+                    <span class="app-title">GameMod Master</span>
                   </div>
-                </n-card>
-              </window-layout>
+                  <div class="titlebar-controls">
+                    <button class="control-btn" @click="minimizeWindow">
+                      <NIcon size="14"><RemoveOutline /></NIcon>
+                    </button>
+                    <button class="control-btn" @click="maximizeWindow">
+                      <NIcon size="12"><SquareOutline /></NIcon>
+                    </button>
+                    <button class="control-btn close-btn" @click="closeWindow">
+                      <NIcon size="14"><CloseOutline /></NIcon>
+                    </button>
+                  </div>
+                </header>
+
+                <!-- 主体区域 -->
+                <div class="app-body">
+                  <!-- 侧边导航栏 -->
+                  <aside class="app-sidebar">
+                    <nav class="sidebar-nav">
+                      <NTooltip
+                        v-for="item in navItems"
+                        :key="item.path"
+                        placement="right"
+                        :show-arrow="false"
+                      >
+                        <template #trigger>
+                          <button
+                            class="nav-item"
+                            :class="{ active: currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) }"
+                            @click="navigateTo(item.path)"
+                          >
+                            <NBadge
+                              v-if="item.badge && item.badge() > 0"
+                              :value="item.badge()"
+                              :max="99"
+                              type="info"
+                            >
+                              <NIcon size="22"><component :is="item.icon" /></NIcon>
+                            </NBadge>
+                            <NIcon v-else size="22"><component :is="item.icon" /></NIcon>
+                          </button>
+                        </template>
+                        {{ item.label }}
+                      </NTooltip>
+                    </nav>
+                  </aside>
+
+                  <!-- 主内容区域 -->
+                  <main class="app-main">
+                    <n-scrollbar class="main-scrollbar">
+                      <div class="main-content">
+                        <router-view v-slot="{ Component }">
+                          <transition name="fade" mode="out-in">
+                            <component :is="Component" />
+                          </transition>
+                        </router-view>
+                      </div>
+                    </n-scrollbar>
+                  </main>
+                </div>
+              </div>
             </n-dialog-provider>
           </n-loading-bar-provider>
         </n-notification-provider>
@@ -134,97 +170,201 @@ const initUpdateCheck = async () => {
 </template>
 
 <style>
-/* 重置基础样式 */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html,
-body,
-#app {
+html, body, #app {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+</style>
+
+<style scoped>
+.app-container {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  overflow: hidden;
 }
 
-/* 应用主内容 */
+.app-container.dark {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* 标题栏 */
+.app-titlebar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+}
+
+.dark .app-titlebar {
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-logo {
+  color: #7c3aed;
+}
+
+.app-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  letter-spacing: -0.02em;
+}
+
+.dark .app-title {
+  color: #e2e8f0;
+}
+
+.titlebar-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.control-btn {
+  width: 32px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.control-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1f2937;
+}
+
+.dark .control-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.close-btn:hover {
+  background: #ef4444 !important;
+  color: white !important;
+}
+
+/* 主体区域 */
+.app-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 侧边栏 */
+.app-sidebar {
+  width: 64px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+  flex-shrink: 0;
+}
+
+.dark .app-sidebar {
+  background: rgba(15, 23, 42, 0.6);
+  border-right-color: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-item {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.nav-item:hover {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.dark .nav-item {
+  color: #94a3b8;
+}
+
+.dark .nav-item:hover {
+  color: #a78bfa;
+}
+
+/* 主内容区域 */
 .app-main {
-  height: 100%;
+  flex: 1;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* 导航标签页 */
-.nav-tabs {
-  padding: 0 16px;
-  border-bottom: 1px solid var(--divider-color);
-  background-color: var(--card-color);
-  flex-shrink: 0;
+.main-scrollbar {
+  height: 100%;
 }
 
-.tab-content {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  line-height: 1;
-}
-
-.tab-content :deep(.n-icon) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -2px;
-}
-
-.tab-label {
-  font-size: 14px;
-  line-height: 1;
-}
-
-/* 内容区域 */
-.app-content {
-  flex: 1;
-  padding: 20px;
-  background-color: var(--body-color);
-}
-
-.app-content :deep(.n-scrollbar-container) {
-  padding-right: 16px;
+.main-content {
+  padding: 24px;
+  min-height: 100%;
 }
 
 /* 过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-</style>
-
-<style scoped>
-:deep(.n-config-provider),
-:deep(.n-message-provider),
-:deep(.n-notification-provider),
-:deep(.n-loading-bar-provider),
-:deep(.n-dialog-provider) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-:deep(.n-card) {
-  height: 100%;
-}
-
-:deep(.n-card-content) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 </style>

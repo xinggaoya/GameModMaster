@@ -74,14 +74,14 @@ const props = defineProps({
   },
 })
 
-const slots = useSlots()
+const slots: ReturnType<typeof useSlots> = useSlots()
 
 // 计算按钮样式类
-const buttonClass = computed(() => {
+const buttonClass = computed((): Record<string, boolean> => {
   return {
     [`variant-${props.variant}`]: true,
-    'with-icon': props.icon,
-    'with-text': !props.circle && slots.default,
+    'with-icon': !!props.icon,
+    'with-text': !props.circle && !!slots.default,
   }
 })
 </script>

@@ -1,7 +1,7 @@
 // 导入的引用
 use crate::api::error::{AppError, AppResult};
 use crate::api::trainer::DownloadProgress;
-use crate::utils::path::get_downloads_dir;
+use crate::services::settings;
 use futures_util::StreamExt;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -179,14 +179,14 @@ pub fn clear_all_downloads() -> AppResult<usize> {
 // 获取下载目录
 #[tauri::command]
 pub fn get_download_directory() -> AppResult<String> {
-    let download_dir = get_downloads_dir()?;
+    let download_dir = settings::get_download_path()?;
     Ok(download_dir.to_string_lossy().to_string())
 }
 
 // 打开下载目录
 #[tauri::command]
 pub fn open_download_directory() -> AppResult<()> {
-    let download_dir = get_downloads_dir()?;
+    let download_dir = settings::get_download_path()?;
 
     #[cfg(target_os = "windows")]
     {

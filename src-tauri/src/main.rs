@@ -25,6 +25,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // 创建系统托盘
             let show_item = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
@@ -90,6 +91,13 @@ fn main() {
             api::updater::get_app_version,
             // 管理员权限API
             api::admin::restart_as_admin,
+            // 设置相关API
+            api::settings::get_settings,
+            api::settings::save_settings,
+            api::settings::get_download_path,
+            api::settings::set_download_path,
+            api::settings::select_download_folder,
+            api::settings::open_download_folder,
             // 存储相关API
             api::storage::get_installed_trainers,
             api::storage::save_installed_trainers,

@@ -1,88 +1,81 @@
 <template>
   <div class="state-display">
-    <!-- 加载中状态 -->
     <div v-if="loading" class="loading-state">
       <slot name="loading">
         <div class="default-loading">
           <NSpin :size="spinSize" />
-          <p v-if="loadingText" class="loading-text">{{ loadingText }}</p>
+          <p v-if="displayLoadingText" class="loading-text">{{ displayLoadingText }}</p>
         </div>
       </slot>
     </div>
 
-    <!-- 错误状态 -->
     <div v-else-if="error" class="error-state">
       <slot name="error">
-        <NResult status="error" :title="errorTitle" :description="error">
+        <NResult status="error" :title="displayErrorTitle" :description="error">
           <template #footer>
-            <NButton @click="retryHandler" v-if="hasRetry">重试</NButton>
+            <NButton @click="retryHandler" v-if="hasRetry">{{ t('common.retry') }}</NButton>
           </template>
         </NResult>
       </slot>
     </div>
 
-    <!-- 空数据状态 -->
     <div v-else-if="empty" class="empty-state">
       <slot name="empty">
-        <NEmpty :description="emptyText" />
+        <NEmpty :description="displayEmptyText" />
       </slot>
     </div>
 
-    <!-- 正常数据状态 -->
     <slot v-else></slot>
   </div>
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, computed, type PropType } from 'vue'
 import { NSpin, NEmpty, NResult, NButton } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
-  // 是否加载中
   loading: {
     type: Boolean,
     default: false,
   },
-  // 加载中提示文字
   loadingText: {
     type: String,
-    default: '加载中...',
+    default: '',
   },
-  // 加载图标大小
   spinSize: {
     type: Number,
     default: 48,
   },
-  // 错误信息 - 接受null或字符串
   error: {
-    type: [String, null],
+    type: [String, null] as PropType<string | null>,
     default: '',
   },
-  // 错误标题
   errorTitle: {
     type: String,
-    default: '发生错误',
+    default: '',
   },
-  // 是否显示重试按钮
   hasRetry: {
     type: Boolean,
     default: true,
   },
-  // 是否为空数据
   empty: {
     type: Boolean,
     default: false,
   },
-  // 空数据提示文字
   emptyText: {
     type: String,
-    default: '暂无数据',
+    default: '',
   },
 })
 
 const emit = defineEmits(['retry'])
+const { t } = useI18n()
 
-// 重试处理函数
+const displayLoadingText = computed(() => props.loadingText || t('common.loading'))
+const displayErrorTitle = computed(() => props.errorTitle || t('common.errorTitle'))
+const displayEmptyText = computed(() => props.emptyText || t('common.noData'))
+
 const retryHandler = () => {
   emit('retry')
 }

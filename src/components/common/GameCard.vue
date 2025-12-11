@@ -2,20 +2,17 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage, useDialog } from 'naive-ui'
-import {
-  DownloadOutline,
-  PlayOutline,
-  TrashOutline,
-  TimeOutline,
-} from '@vicons/ionicons5'
+import { DownloadOutline, PlayOutline, TrashOutline, TimeOutline } from '@vicons/ionicons5'
 import type { Trainer } from '@/types'
 import { useTrainerStore } from '@/stores/trainer'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   trainer: Trainer
   showButtons?: 'default' | 'downloaded'
 }>()
 
+const { t, locale } = useI18n()
 const showButtons = props.showButtons || 'default'
 
 const router = useRouter()
@@ -23,61 +20,55 @@ const store = useTrainerStore()
 const message = useMessage()
 const dialog = useDialog()
 
-// 状态
 const isDownloaded = computed(() => {
   return store.downloadedTrainers.some((t) => t.id === props.trainer.id)
 })
 
-// 格式化日期
 const formatDate = (dateString: string) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+  return new Intl.DateTimeFormat(locale.value, { month: 'short', day: 'numeric' }).format(date)
 }
 
-// 处理卡片点击
 const handleCardClick = () => {
   router.push(`/detail/${props.trainer.id}`)
 }
 
-// 下载
 const handleDownload = async (e: Event) => {
   e.stopPropagation()
   try {
-    message.loading('正在下载...')
+    message.loading(t('common.loading'))
     const detail = await store.getTrainerDetail(props.trainer.id)
     await store.downloadTrainer(detail)
-    message.success('下载成功')
+    message.success(t('gameCard.messages.downloadSuccess'))
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '下载失败')
+    message.error(error instanceof Error ? error.message : t('gameCard.messages.downloadFailed'))
   }
 }
 
-// 启动
 const handleLaunch = async (e: Event) => {
   e.stopPropagation()
   try {
     await store.launchTrainer(props.trainer.id)
-    message.success('已启动')
+    message.success(t('gameCard.messages.launchSuccess'))
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '启动失败')
+    message.error(error instanceof Error ? error.message : t('gameCard.messages.launchFailed'))
   }
 }
 
-// 删除
 const handleDelete = async (e: Event) => {
   e.stopPropagation()
   dialog.warning({
-    title: '确认删除',
-    content: `确定要删除 "${props.trainer.name}" 吗？`,
-    positiveText: '删除',
-    negativeText: '取消',
+    title: t('gameCard.deleteConfirm.title'),
+    content: t('gameCard.deleteConfirm.content', { name: props.trainer.name }),
+    positiveText: t('gameCard.deleteConfirm.positive'),
+    negativeText: t('gameCard.deleteConfirm.negative'),
     onPositiveClick: async () => {
       try {
         await store.deleteTrainer(props.trainer.id)
-        message.success('已删除')
+        message.success(t('gameCard.messages.deleteSuccess'))
       } catch (error) {
-        message.error('删除失败')
+        message.error(t('gameCard.messages.deleteFailed'))
       }
     },
   })
@@ -86,7 +77,6 @@ const handleDelete = async (e: Event) => {
 
 <template>
   <div class="game-card" @click="handleCardClick">
-    <!-- 封面图 -->
     <div class="card-cover">
       <img
         :src="trainer.thumbnail || '/placeholder.png'"
@@ -95,16 +85,14 @@ const handleDelete = async (e: Event) => {
         loading="lazy"
       />
       <div class="cover-overlay">
-        <span class="view-hint">查看详情</span>
+        <span class="view-hint">{{ t('gameCard.viewDetail') }}</span>
       </div>
 
-      <!-- 状态标签 -->
       <div v-if="isDownloaded" class="status-tag downloaded">
-        已下载
+        {{ t('gameCard.downloaded') }}
       </div>
     </div>
 
-    <!-- 内容区 -->
     <div class="card-content">
       <h3 class="card-title" :title="trainer.name">
         {{ trainer.name }}
@@ -118,7 +106,6 @@ const handleDelete = async (e: Event) => {
         </span>
       </div>
 
-      <!-- 操作按钮 -->
       <div class="card-actions">
         <template v-if="showButtons === 'downloaded'">
           <button class="action-btn danger" @click="handleDelete">
@@ -126,7 +113,7 @@ const handleDelete = async (e: Event) => {
           </button>
           <button class="action-btn primary" @click="handleLaunch">
             <NIcon size="14"><PlayOutline /></NIcon>
-            启动
+            {{ t('gameCard.actions.launch') }}
           </button>
         </template>
         <template v-else>
@@ -136,7 +123,7 @@ const handleDelete = async (e: Event) => {
             :disabled="isDownloaded"
           >
             <NIcon size="14"><DownloadOutline /></NIcon>
-            {{ isDownloaded ? '已下载' : '下载' }}
+            {{ isDownloaded ? t('gameCard.actions.downloaded') : t('gameCard.actions.download') }}
           </button>
         </template>
       </div>
@@ -161,7 +148,6 @@ const handleDelete = async (e: Event) => {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
 }
 
-/* 封面 */
 .card-cover {
   position: relative;
   aspect-ratio: 16/9;
@@ -218,7 +204,6 @@ const handleDelete = async (e: Event) => {
   color: white;
 }
 
-/* 内容 */
 .card-content {
   padding: 14px;
 }
@@ -259,7 +244,6 @@ const handleDelete = async (e: Event) => {
   font-weight: 600;
 }
 
-/* 操作按钮 */
 .card-actions {
   display: flex;
   gap: 8px;

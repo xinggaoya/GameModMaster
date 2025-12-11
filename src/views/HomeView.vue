@@ -1,38 +1,27 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  SearchOutline,
-  RefreshOutline,
-  GameControllerOutline,
-  FilterOutline,
-} from '@vicons/ionicons5'
+import { SearchOutline, RefreshOutline, GameControllerOutline } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
-
-// 导入自定义组件
 import GameCard from '@/components/common/GameCard.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const store = useTrainerStore()
-const router = useRouter()
 
-// 状态
 const searchQuery = ref('')
 const isSearchFocused = ref(false)
 
-// 计算属性
 const isLoading = computed(() => store.isLoading)
 const totalPages = computed(() => store.totalPages)
 const trainers = computed(() => store.trainers)
 const errorMessage = computed(() => store.error || '')
 
-// 统计数据
 const stats = computed(() => [
-  { label: '可用', value: trainers.value.length, color: '#7c3aed' },
-  { label: '已下载', value: store.downloadedTrainers.length, color: '#0891b2' },
-  { label: '已安装', value: store.installedTrainers.length, color: '#059669' },
+  { label: t('home.stats.available'), value: trainers.value.length, color: '#7c3aed' },
+  { label: t('home.stats.downloaded'), value: store.downloadedTrainers.length, color: '#0891b2' },
+  { label: t('home.stats.installed'), value: store.installedTrainers.length, color: '#059669' },
 ])
 
-// 搜索处理
 const handleSearch = () => {
   if (searchQuery.value.trim()) {
     store.currentPage = 1
@@ -42,13 +31,11 @@ const handleSearch = () => {
   }
 }
 
-// 清除搜索
 const clearSearch = () => {
   searchQuery.value = ''
   store.fetchTrainers(1)
 }
 
-// 刷新
 const handleRefresh = async () => {
   if (searchQuery.value.trim()) {
     await store.searchTrainers(searchQuery.value, store.currentPage)
@@ -57,7 +44,6 @@ const handleRefresh = async () => {
   }
 }
 
-// 分页
 const handlePageChange = async (page: number) => {
   store.currentPage = page
   if (searchQuery.value.trim()) {
@@ -68,7 +54,6 @@ const handlePageChange = async (page: number) => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-// 组件挂载
 onMounted(async () => {
   if (trainers.value.length === 0) {
     await store.fetchTrainers(1)
@@ -78,15 +63,13 @@ onMounted(async () => {
 
 <template>
   <div class="home-view">
-    <!-- 页面头部 -->
     <header class="page-header">
       <div class="header-content">
         <div class="header-text">
-          <h1 class="page-title">探索修改器</h1>
-          <p class="page-subtitle">发现上千款游戏修改器，让游戏更有趣</p>
+          <h1 class="page-title">{{ t('home.title') }}</h1>
+          <p class="page-subtitle">{{ t('home.subtitle') }}</p>
         </div>
 
-        <!-- 统计 -->
         <div class="stats-row">
           <div
             v-for="stat in stats"
@@ -101,7 +84,6 @@ onMounted(async () => {
       </div>
     </header>
 
-    <!-- 搜索栏 -->
     <section class="search-section">
       <div class="search-wrapper" :class="{ focused: isSearchFocused }">
         <NIcon class="search-icon" size="20">
@@ -111,7 +93,7 @@ onMounted(async () => {
           v-model="searchQuery"
           type="text"
           class="search-input"
-          placeholder="搜索游戏或修改器..."
+          :placeholder="t('home.searchPlaceholder')"
           @focus="isSearchFocused = true"
           @blur="isSearchFocused = false"
           @keydown.enter="handleSearch"
@@ -121,14 +103,14 @@ onMounted(async () => {
           class="clear-btn"
           @click="clearSearch"
         >
-          清除
+          {{ t('common.clear') }}
         </button>
         <button
           class="search-btn"
           @click="handleSearch"
           :disabled="isLoading"
         >
-          搜索
+          {{ t('common.search') }}
         </button>
       </div>
 
@@ -139,48 +121,47 @@ onMounted(async () => {
       </button>
     </section>
 
-    <!-- 结果信息 -->
     <div class="results-info" v-if="!isLoading && trainers.length > 0">
       <span class="results-count">
-        {{ searchQuery ? `搜索 "${searchQuery}"` : '全部修改器' }}
-        · {{ trainers.length }} 个结果
+        {{
+          searchQuery
+            ? t('home.results.query', { query: searchQuery })
+            : t('home.results.all')
+        }}
+        - {{ t('home.results.count', { count: trainers.length }) }}
       </span>
     </div>
 
-    <!-- 加载状态 -->
     <div v-if="isLoading" class="loading-state">
       <NSpin size="large" />
-      <p class="loading-text">加载中...</p>
+      <p class="loading-text">{{ t('common.loading') }}</p>
     </div>
 
-    <!-- 错误状态 -->
     <div v-else-if="errorMessage" class="error-state">
       <NIcon size="48" color="#ef4444">
         <GameControllerOutline />
       </NIcon>
-      <h3>出错了</h3>
+      <h3>{{ t('common.errorTitle') }}</h3>
       <p>{{ errorMessage }}</p>
       <NButton @click="handleRefresh" type="primary">
-        重试
+        {{ t('common.retry') }}
       </NButton>
     </div>
 
-    <!-- 空状态 -->
     <div v-else-if="trainers.length === 0" class="empty-state">
       <NIcon size="64" color="#94a3b8">
         <SearchOutline />
       </NIcon>
-      <h3>没有找到结果</h3>
+      <h3>{{ t('home.empty.title') }}</h3>
       <p v-if="searchQuery">
-        没有找到 "{{ searchQuery }}" 相关的修改器
+        {{ t('home.empty.withQuery', { query: searchQuery }) }}
       </p>
-      <p v-else>暂时没有可用的修改器</p>
+      <p v-else>{{ t('home.empty.withoutQuery') }}</p>
       <NButton v-if="searchQuery" @click="clearSearch" type="primary">
-        清除搜索
+        {{ t('common.clear') }}
       </NButton>
     </div>
 
-    <!-- 修改器网格 -->
     <section v-else class="trainers-grid">
       <GameCard
         v-for="trainer in trainers"
@@ -189,7 +170,6 @@ onMounted(async () => {
       />
     </section>
 
-    <!-- 分页 -->
     <div class="pagination" v-if="totalPages > 1 && !isLoading">
       <NPagination
         v-model:page="store.currentPage"
@@ -208,7 +188,6 @@ onMounted(async () => {
   margin: 0 auto;
 }
 
-/* 页面头部 */
 .page-header {
   margin-bottom: 24px;
 }
@@ -265,7 +244,6 @@ onMounted(async () => {
   color: #64748b;
 }
 
-/* 搜索栏 */
 .search-section {
   display: flex;
   gap: 12px;
@@ -387,7 +365,6 @@ onMounted(async () => {
   to { transform: rotate(360deg); }
 }
 
-/* 结果信息 */
 .results-info {
   margin-bottom: 20px;
 }
@@ -398,7 +375,6 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-/* 状态 */
 .loading-state,
 .error-state,
 .empty-state {
@@ -430,14 +406,12 @@ onMounted(async () => {
   color: #64748b;
 }
 
-/* 网格 */
 .trainers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
 }
 
-/* 分页 */
 .pagination {
   display: flex;
   justify-content: center;
@@ -448,7 +422,6 @@ onMounted(async () => {
   border-radius: 16px;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;

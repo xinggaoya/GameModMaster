@@ -1,46 +1,41 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  DownloadOutline,
-  SearchOutline,
-  FolderOpenOutline,
-  GameControllerOutline,
-} from '@vicons/ionicons5'
+import { DownloadOutline, SearchOutline, FolderOpenOutline, GameControllerOutline } from '@vicons/ionicons5'
 import { useTrainerStore } from '../stores/trainer'
 import GameCard from '@/components/common/GameCard.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useMessage } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const store = useTrainerStore()
 const message = useMessage()
+const { t } = useI18n()
 
-// 状态
 const searchQuery = ref('')
 
-// 过滤后的修改器
 const filteredTrainers = computed(() => {
   let result = [...store.downloadedTrainers]
-  
+
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(
       (t) =>
         t.name.toLowerCase().includes(query) ||
-        t.game_version.toLowerCase().includes(query)
+        t.game_version.toLowerCase().includes(query),
     )
   }
 
   return result
 })
 
-// 打开下载目录
 const openDownloadFolder = async () => {
   try {
     await invoke('open_download_folder')
   } catch (error) {
-    message.error('打开文件夹失败')
+    console.error(error)
+    message.error(t('downloads.errors.openFolder'))
   }
 }
 
@@ -53,11 +48,10 @@ onMounted(() => {
 
 <template>
   <div class="downloads-view">
-    <!-- 页面头部 -->
     <header class="page-header">
       <div class="header-text">
-        <h1 class="page-title">我的收藏</h1>
-        <p class="page-subtitle">管理已下载的游戏修改器</p>
+        <h1 class="page-title">{{ t('downloads.title') }}</h1>
+        <p class="page-subtitle">{{ t('downloads.subtitle') }}</p>
       </div>
 
       <div class="header-actions">
@@ -65,24 +59,22 @@ onMounted(() => {
           <template #icon>
             <NIcon><FolderOpenOutline /></NIcon>
           </template>
-          打开目录
+          {{ t('common.openFolder') }}
         </NButton>
       </div>
     </header>
 
-    <!-- 统计 -->
     <div class="stats-bar">
       <div class="stat-item">
         <span class="stat-value">{{ store.downloadedTrainers.length }}</span>
-        <span class="stat-label">已下载</span>
+        <span class="stat-label">{{ t('downloads.stats.downloaded') }}</span>
       </div>
       <div class="stat-item">
         <span class="stat-value">{{ store.installedTrainers.length }}</span>
-        <span class="stat-label">已安装</span>
+        <span class="stat-label">{{ t('downloads.stats.installed') }}</span>
       </div>
     </div>
 
-    <!-- 搜索 -->
     <div class="search-bar" v-if="store.downloadedTrainers.length > 0">
       <NIcon class="search-icon" size="18">
         <SearchOutline />
@@ -91,41 +83,39 @@ onMounted(() => {
         v-model="searchQuery"
         type="text"
         class="search-input"
-        placeholder="搜索已下载的修改器..."
+        :placeholder="t('downloads.searchPlaceholder')"
       />
     </div>
 
-    <!-- 加载状态 -->
     <div v-if="store.isLoading" class="loading-state">
       <NSpin size="large" />
     </div>
 
-    <!-- 空状态 -->
     <div v-else-if="store.downloadedTrainers.length === 0" class="empty-state">
       <NIcon size="64" color="#94a3b8">
         <DownloadOutline />
       </NIcon>
-      <h3>还没有下载任何修改器</h3>
-      <p>去探索页面下载游戏修改器吧</p>
+      <h3>{{ t('downloads.empty.title') }}</h3>
+      <p>{{ t('downloads.empty.subtitle') }}</p>
       <NButton @click="router.push('/')" type="primary" size="large">
         <template #icon>
           <NIcon><GameControllerOutline /></NIcon>
         </template>
-        开始探索
+        {{ t('common.startExploring') }}
       </NButton>
     </div>
 
-    <!-- 空搜索结果 -->
     <div v-else-if="filteredTrainers.length === 0" class="empty-state">
       <NIcon size="48" color="#94a3b8">
         <SearchOutline />
       </NIcon>
-      <h3>没有找到结果</h3>
-      <p>没有找到 "{{ searchQuery }}" 相关的修改器</p>
-      <NButton @click="searchQuery = ''" size="large">清除搜索</NButton>
+      <h3>{{ t('downloads.empty.searchTitle') }}</h3>
+      <p>{{ t('downloads.empty.searchSubtitle', { query: searchQuery }) }}</p>
+      <NButton @click="searchQuery = ''" size="large">
+        {{ t('common.clear') }}
+      </NButton>
     </div>
 
-    <!-- 修改器网格 -->
     <div v-else class="trainers-grid">
       <GameCard
         v-for="trainer in filteredTrainers"

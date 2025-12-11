@@ -7,14 +7,13 @@
     @update:show="updateShow"
   >
     <div class="update-dialog">
-      <!-- 更新信息 -->
       <div v-if="updateInfo && !isDownloading" class="update-info">
         <div class="version-info">
-          <NText>当前版本: {{ currentVersion }}</NText>
-          <NText type="success">最新版本: {{ updateInfo.latest_version }}</NText>
+          <NText>{{ t('update.currentVersion') }}: {{ currentVersion }}</NText>
+          <NText type="success">{{ t('update.latestVersion') }}: {{ updateInfo.latest_version }}</NText>
         </div>
 
-        <NDivider>更新内容</NDivider>
+        <NDivider>{{ t('update.contentTitle') }}</NDivider>
 
         <div class="release-notes">
           <NScrollbar style="max-height: 200px">
@@ -23,7 +22,6 @@
         </div>
       </div>
 
-      <!-- 下载进度 -->
       <div v-if="isDownloading" class="download-progress">
         <NProgress
           type="line"
@@ -37,14 +35,16 @@
 
     <template #action>
       <NSpace justify="end">
-        <NButton v-if="!isDownloading" @click="onCancel" :disabled="isDownloading"> 取消 </NButton>
+        <NButton v-if="!isDownloading" @click="onCancel" :disabled="isDownloading">
+          {{ t('update.cancel') }}
+        </NButton>
         <NButton
           v-if="!isDownloading && updateInfo"
           type="primary"
           @click="startUpdate"
           :disabled="isDownloading"
         >
-          立即更新
+          {{ t('update.start') }}
         </NButton>
       </NSpace>
     </template>
@@ -52,8 +52,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineProps, defineEmits } from 'vue'
+import { computed, defineProps, defineEmits } from 'vue'
 import { NModal, NButton, NSpace, NText, NDivider, NProgress, NScrollbar } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 import {
   updateInfo,
   updateProgress,
@@ -73,28 +74,24 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:show', 'cancel'])
+const { t } = useI18n()
 
-// 对话框标题
 const title = computed(() => {
   if (isDownloading.value) {
-    return '正在下载更新'
+    return t('update.downloadingTitle')
   }
-  return '发现新版本'
+  return t('update.foundTitle')
 })
 
-// 更新show值
 const updateShow = (value: boolean) => {
   emit('update:show', value)
 }
 
-// 开始更新
 const startUpdate = async () => {
   if (!updateInfo.value) return
-
   await downloadAndInstallUpdate(updateInfo.value.download_url)
 }
 
-// 取消更新
 const onCancel = () => {
   emit('update:show', false)
   emit('cancel')

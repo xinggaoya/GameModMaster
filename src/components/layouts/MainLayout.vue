@@ -158,12 +158,14 @@ const handleSearch = () => {
 // 切换主题
 const toggleTheme = () => {
   isDark.value = !isDark.value
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
-  if (isDark.value) {
-    document.documentElement.classList.add('dark-theme')
-  } else {
-    document.documentElement.classList.remove('dark-theme')
-  }
+  const themeSetting = isDark.value ? 'dark' : 'light'
+  localStorage.setItem('theme', themeSetting)
+
+  // 保持与全局同步：同时添加 .dark 与 .dark-theme
+  document.documentElement.classList.toggle('dark-theme', isDark.value)
+  document.documentElement.classList.toggle('dark', isDark.value)
+  document.body.classList.toggle('dark-theme', isDark.value)
+  document.body.classList.toggle('dark', isDark.value)
 }
 
 // 获取页面标题
@@ -191,9 +193,10 @@ onMounted(() => {
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme) {
     isDark.value = savedTheme === 'dark'
-    if (isDark.value) {
-      document.documentElement.classList.add('dark-theme')
-    }
+    document.documentElement.classList.toggle('dark-theme', isDark.value)
+    document.documentElement.classList.toggle('dark', isDark.value)
+    document.body.classList.toggle('dark-theme', isDark.value)
+    document.body.classList.toggle('dark', isDark.value)
   }
 })
 </script>

@@ -14,57 +14,106 @@ import {
 import themeOverrides from '@/assets/naive-ui-theme-overrides.json'
 import UpdateDialog from './components/update/UpdateDialog.vue'
 import { useTrainerStore } from './stores/trainer'
-import {
-  checkForUpdates,
-  initUpdateListener,
-  getAppVersion,
-} from './services/updaterService'
+import { checkForUpdates, initUpdateListener, getAppVersion } from './services/updaterService'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { useI18n } from 'vue-i18n'
+import { setLocale, type Locale } from './i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const store = useTrainerStore()
+type ThemeSetting = 'light' | 'dark' | 'system'
 const isDark = ref(false)
 const appWindow = getCurrentWindow()
+const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
-// 根据isDark的值返回主题
+const syncDomTheme = (resolvedTheme: 'light' | 'dark') => {
+  const root = document.documentElement
+  const body = document.body
+  const isDarkMode = resolvedTheme === 'dark'
+  root.classList.toggle('dark-theme', isDarkMode)
+  root.classList.toggle('light-theme', !isDarkMode)
+  root.classList.toggle('dark', isDarkMode)
+  body.classList.toggle('dark', isDarkMode)
+  body.classList.toggle('dark-theme', isDarkMode)
+  root.dataset.theme = resolvedTheme
+}
+
+const resolveTheme = (themeSetting: ThemeSetting) => {
+  if (themeSetting === 'system') {
+    return mediaQuery.matches ? 'dark' : 'light'
+  }
+  return themeSetting === 'dark' ? 'dark' : 'light'
+}
+
 const theme = computed(() => (isDark.value ? darkTheme : null))
 
-// 导航项
-const navItems = [
-  { path: '/', label: '探索', icon: HomeOutline },
-  { path: '/downloads', label: '收藏', icon: DownloadOutline, badge: () => store.downloadedTrainers.length },
-  { path: '/settings', label: '设置', icon: SettingsOutline },
-]
+const navItems = computed(() => [
+  { path: '/', label: t('nav.explore'), icon: HomeOutline },
+  {
+    path: '/downloads',
+    label: t('nav.downloads'),
+    icon: DownloadOutline,
+    badge: () => store.downloadedTrainers.length,
+  },
+  { path: '/settings', label: t('nav.settings'), icon: SettingsOutline },
+])
 
-// 当前激活的路由
 const currentPath = computed(() => route.path)
 
-// 导航到指定路由
 const navigateTo = (path: string) => {
   router.push(path)
 }
 
-// 窗口控制
 const minimizeWindow = () => appWindow.minimize()
 const maximizeWindow = () => appWindow.toggleMaximize()
 const closeWindow = () => appWindow.close()
 
-// 更新对话框
 const showUpdateDialog = ref(false)
 const currentVersion = ref('')
 
+const applyTheme = (themeSetting: ThemeSetting) => {
+  localStorage.setItem('theme', themeSetting)
+  const resolvedTheme = resolveTheme(themeSetting)
+  isDark.value = resolvedTheme === 'dark'
+  syncDomTheme(resolvedTheme)
+}
+
+mediaQuery.addEventListener('change', (e) => {
+  const savedTheme = (localStorage.getItem('theme') as ThemeSetting | null) || 'system'
+  if (savedTheme === 'system') {
+    isDark.value = e.matches
+    syncDomTheme(e.matches ? 'dark' : 'light')
+  }
+})
+
 onMounted(async () => {
-  // 加载主题设置
-  const savedTheme = localStorage.getItem('theme')
-  if (savedTheme) {
-    isDark.value = savedTheme === 'dark'
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const settings = await invoke<{ theme?: string; language?: string }>('get_settings')
+
+    if (settings?.theme) {
+      applyTheme((settings.theme as ThemeSetting) || 'system')
+    } else {
+      const savedTheme = (localStorage.getItem('theme') as ThemeSetting | null) || 'system'
+      applyTheme(savedTheme)
+    }
+
+    if (settings?.language) {
+      setLocale(settings.language as Locale)
+    }
+  } catch {
+    const savedTheme = (localStorage.getItem('theme') as ThemeSetting | null) || 'system'
+    applyTheme(savedTheme)
   }
 
-  // 初始化 store
+  window.addEventListener('theme-change', ((event: CustomEvent<ThemeSetting>) => {
+    applyTheme(event.detail)
+  }) as EventListener)
+
   await store.initialize()
 
-  // 初始化更新检查
   try {
     await initUpdateListener()
     currentVersion.value = await getAppVersion()
@@ -76,7 +125,7 @@ onMounted(async () => {
       }
     }, 5000)
   } catch (error) {
-    console.error('自动检查更新失败:', error)
+    console.error('自动检查更新失败', error)
   }
 })
 </script>
@@ -90,13 +139,12 @@ onMounted(async () => {
           <n-loading-bar-provider>
             <n-dialog-provider>
               <div class="app-container" :class="{ dark: isDark }">
-                <!-- 自定义标题栏 -->
                 <header class="app-titlebar" data-tauri-drag-region>
                   <div class="titlebar-left" data-tauri-drag-region>
                     <NIcon size="20" class="app-logo">
                       <GameControllerOutline />
                     </NIcon>
-                    <span class="app-title">GameMod Master</span>
+                    <span class="app-title">{{ t('common.appName') }}</span>
                   </div>
                   <div class="titlebar-controls">
                     <button class="control-btn" @click="minimizeWindow">
@@ -111,9 +159,7 @@ onMounted(async () => {
                   </div>
                 </header>
 
-                <!-- 主体区域 -->
                 <div class="app-body">
-                  <!-- 侧边导航栏 -->
                   <aside class="app-sidebar">
                     <nav class="sidebar-nav">
                       <NTooltip
@@ -144,7 +190,6 @@ onMounted(async () => {
                     </nav>
                   </aside>
 
-                  <!-- 主内容区域 -->
                   <main class="app-main">
                     <n-scrollbar class="main-scrollbar">
                       <div class="main-content">
@@ -165,7 +210,6 @@ onMounted(async () => {
     </n-message-provider>
   </n-config-provider>
 
-  <!-- 更新对话框 -->
   <UpdateDialog v-model:show="showUpdateDialog" :current-version="currentVersion" />
 </template>
 
@@ -198,7 +242,6 @@ html, body, #app {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
-/* 标题栏 */
 .app-titlebar {
   height: 40px;
   display: flex;
@@ -274,14 +317,12 @@ html, body, #app {
   color: white !important;
 }
 
-/* 主体区域 */
 .app-body {
   flex: 1;
   display: flex;
   overflow: hidden;
 }
 
-/* 侧边栏 */
 .app-sidebar {
   width: 64px;
   background: rgba(255, 255, 255, 0.6);
@@ -340,7 +381,6 @@ html, body, #app {
   color: #a78bfa;
 }
 
-/* 主内容区域 */
 .app-main {
   flex: 1;
   overflow: hidden;
@@ -357,7 +397,6 @@ html, body, #app {
   min-height: 100%;
 }
 
-/* 过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;

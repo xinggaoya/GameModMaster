@@ -73,10 +73,10 @@ export const useTrainerStore = defineStore('trainer', () => {
         StorageService.getInstalledTrainers(),
         StorageService.getDownloadedTrainers()
       ])
-      
+
       installedTrainers.value = installed
       downloadedTrainers.value = downloaded
-      
+
       console.log('Store: 已加载数据:', {
         installed: installedTrainers.value.length,
         downloaded: downloadedTrainers.value.length,
@@ -324,6 +324,16 @@ export const useTrainerStore = defineStore('trainer', () => {
       if (!exists) {
         downloadedTrainers.value.push(trainer)
         await StorageService.saveDownloadedTrainers(downloadedTrainers.value)
+      }
+
+      // 检查是否需要自动打开文件夹
+      try {
+        const settings = await invoke<{ auto_open_folder: boolean }>('get_settings')
+        if (settings.auto_open_folder) {
+          await invoke('open_download_folder')
+        }
+      } catch (err) {
+        console.warn('无法获取设置或打开文件夹:', err)
       }
 
       return result

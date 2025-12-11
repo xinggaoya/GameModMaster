@@ -25,7 +25,13 @@
   --font-gaming: 'Lato', system-ui, sans-serif;
 }
 
-.dark {
+:root, body {
+  background: var(--body-color);
+  color: var(--text-primary);
+}
+
+.dark,
+.dark-theme {
   --text-color: #e1e1e1;
   --text-color-secondary: #aaaaaa;
   --text-primary: #e1e1e1;

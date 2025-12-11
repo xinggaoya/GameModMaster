@@ -7,7 +7,7 @@
           <n-space>
             <n-tag type="info" size="small">{{ formatStatus }}</n-tag>
             <n-button v-if="isCancellable" size="tiny" quaternary @click="handleCancel">
-              取消
+              {{ t('progress.cancel') }}
             </n-button>
           </n-space>
         </div>
@@ -33,20 +33,20 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import { NCard, NProgress, NTag, NButton, NSpace } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
-// 组件属性
 const props = defineProps<{
   trainerId: string
 }>()
 
-// 组件事件
+const { t } = useI18n()
+
 const emit = defineEmits<{
   (event: 'completed', trainerId: string): void
   (event: 'error', trainerId: string): void
   (event: 'canceled', trainerId: string): void
 }>()
 
-// 下载状态
 const activeDownload = ref<{
   trainer_id: string
   progress: number
@@ -56,16 +56,13 @@ const activeDownload = ref<{
   speed?: number
 } | null>(null)
 
-// 取消处理器
 let unlistenFunc: (() => void) | null = null
 
-// 计算进度百分比
 const progress = computed(() => {
   if (!activeDownload.value) return 0
   return Math.min(Math.round(activeDownload.value.progress), 100)
 })
 
-// 计算进度状态
 const progressStatus = computed(() => {
   if (!activeDownload.value) return 'default'
 
@@ -79,39 +76,35 @@ const progressStatus = computed(() => {
   }
 })
 
-// 处理中状态
 const isProcessing = computed(() => {
   if (!activeDownload.value) return false
   return ['downloading', 'processing', 'extracting'].includes(activeDownload.value.status)
 })
 
-// 是否可取消
 const isCancellable = computed(() => {
   if (!activeDownload.value) return false
   return activeDownload.value.status === 'downloading'
 })
 
-// 格式化状态
 const formatStatus = computed(() => {
-  if (!activeDownload.value) return '等待中'
+  if (!activeDownload.value) return t('progress.status.waiting')
 
   switch (activeDownload.value.status) {
     case 'downloading':
-      return '下载中'
+      return t('progress.status.downloading')
     case 'processing':
-      return '处理中'
+      return t('progress.status.processing')
     case 'extracting':
-      return '解压中'
+      return t('progress.status.extracting')
     case 'completed':
-      return '已完成'
+      return t('progress.status.completed')
     case 'error':
-      return '错误'
+      return t('progress.status.error')
     default:
       return activeDownload.value.status
   }
 })
 
-// 格式化进度
 const formatProgress = computed(() => {
   if (!activeDownload.value) return ''
 
@@ -125,16 +118,13 @@ const formatProgress = computed(() => {
   return downloaded
 })
 
-// 格式化下载速度
 const formatSpeed = computed(() => {
   if (!activeDownload.value || !activeDownload.value.speed) return ''
 
   return `${formatBytes(activeDownload.value.speed * 1024)}/s`
 })
 
-// 初始化下载监听
 onMounted(async () => {
-  // 检查是否有活动下载
   try {
     const downloads = await invoke<
       Array<{
@@ -158,10 +148,9 @@ onMounted(async () => {
       }
     }
   } catch (err) {
-    console.error('获取下载状态失败:', err)
+    console.error('无法获取下载状态', err)
   }
 
-  // 监听下载进度事件
   unlistenFunc = await listen<{
     trainer_id: string
     progress: number
@@ -175,12 +164,10 @@ onMounted(async () => {
     if (payload && payload.trainer_id === props.trainerId) {
       activeDownload.value = payload
 
-      // 处理完成事件
       if (payload.status === 'completed') {
         emit('completed', props.trainerId)
       }
 
-      // 处理错误事件
       if (payload.status === 'error') {
         emit('error', props.trainerId)
       }
@@ -188,14 +175,12 @@ onMounted(async () => {
   })
 })
 
-// 清理监听事件
 onBeforeUnmount(() => {
   if (unlistenFunc) {
     unlistenFunc()
   }
 })
 
-// 取消下载
 const handleCancel = async () => {
   try {
     await invoke('cancel_download', { fileId: props.trainerId })
@@ -205,7 +190,6 @@ const handleCancel = async () => {
   }
 }
 
-// 格式化文件大小
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return '0 Bytes'
 

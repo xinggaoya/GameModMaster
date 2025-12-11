@@ -13,51 +13,49 @@ import {
 import { useTrainerStore } from '@/stores/trainer'
 import { useMessage, useDialog } from 'naive-ui'
 import type { Trainer } from '@/types'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const store = useTrainerStore()
 const message = useMessage()
 const dialog = useDialog()
 
-// 状态
 const loading = ref(true)
 const trainer = ref<Trainer | null>(null)
 const isDownloading = ref(false)
 const downloadProgress = ref(0)
 
-// 计算属性
 const trainerId = computed(() => route.params.id as string)
 const isDownloaded = computed(() =>
-  store.downloadedTrainers.some((t) => t.id === trainer.value?.id)
+  store.downloadedTrainers.some((t) => t.id === trainer.value?.id),
 )
 
-// 获取详情
 const fetchDetail = async () => {
   try {
     loading.value = true
     trainer.value = await store.getTrainerDetail(trainerId.value)
   } catch (error) {
-    message.error('获取详情失败')
+    console.error(error)
+    message.error(t('detail.messages.fetchFailed'))
   } finally {
     loading.value = false
   }
 }
 
-// 格式化数字
 const formatNumber = (num: number): string => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
   return num.toString()
 }
 
-// 下载
 const handleDownload = async () => {
   if (!trainer.value) return
   try {
     isDownloading.value = true
     downloadProgress.value = 0
-    
+
     const interval = setInterval(() => {
       if (downloadProgress.value < 90) {
         downloadProgress.value += Math.random() * 15
@@ -67,41 +65,40 @@ const handleDownload = async () => {
     await store.downloadTrainer(trainer.value)
     clearInterval(interval)
     downloadProgress.value = 100
-    message.success('下载成功')
+    message.success(t('detail.messages.downloadSuccess'))
     await fetchDetail()
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '下载失败')
+    message.error(error instanceof Error ? error.message : t('detail.messages.downloadFailed'))
   } finally {
     isDownloading.value = false
   }
 }
 
-// 启动
 const handleLaunch = async () => {
   if (!trainer.value) return
   try {
     await store.launchTrainer(trainer.value.id)
-    message.success('已启动')
+    message.success(t('detail.messages.launchSuccess'))
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '启动失败')
+    message.error(error instanceof Error ? error.message : t('detail.messages.launchFailed'))
   }
 }
 
-// 删除
 const handleDelete = async () => {
   if (!trainer.value) return
   dialog.warning({
-    title: '确认删除',
-    content: `确定要删除 "${trainer.value.name}" 吗？`,
-    positiveText: '删除',
-    negativeText: '取消',
+    title: t('detail.deleteConfirm.title'),
+    content: t('detail.deleteConfirm.content', { name: trainer.value.name }),
+    positiveText: t('detail.deleteConfirm.positive'),
+    negativeText: t('detail.deleteConfirm.negative'),
     onPositiveClick: async () => {
       try {
         await store.deleteTrainer(trainer.value!.id)
-        message.success('已删除')
+        message.success(t('detail.messages.deleteSuccess'))
         await fetchDetail()
       } catch (error) {
-        message.error('删除失败')
+        console.error(error)
+        message.error(t('detail.messages.deleteFailed'))
       }
     },
   })
@@ -112,21 +109,17 @@ onMounted(fetchDetail)
 
 <template>
   <div class="detail-view">
-    <!-- 返回按钮 -->
     <button class="back-btn" @click="router.back()">
       <NIcon size="20"><ArrowBackOutline /></NIcon>
-      <span>返回</span>
+      <span>{{ t('common.back') }}</span>
     </button>
 
-    <!-- 加载状态 -->
     <div v-if="loading" class="loading-state">
       <NSpin size="large" />
     </div>
 
-    <!-- 内容 -->
     <template v-else-if="trainer">
       <div class="detail-layout">
-        <!-- 左侧封面 -->
         <div class="cover-section">
           <div class="cover-card">
             <img
@@ -134,10 +127,9 @@ onMounted(fetchDetail)
               :alt="trainer.name"
               class="cover-image"
             />
-            <div v-if="isDownloaded" class="status-badge">已下载</div>
+            <div v-if="isDownloaded" class="status-badge">{{ t('detail.status.downloaded') }}</div>
           </div>
 
-          <!-- 操作按钮 -->
           <div class="action-area">
             <template v-if="isDownloading">
               <NProgress
@@ -146,67 +138,66 @@ onMounted(fetchDetail)
                 :show-indicator="false"
                 processing
               />
-              <span class="progress-text">正在下载... {{ Math.round(downloadProgress) }}%</span>
+              <span class="progress-text">
+                {{ t('detail.progress.downloading', { progress: Math.round(downloadProgress) }) }}
+              </span>
             </template>
             <template v-else-if="isDownloaded">
               <NButton type="success" size="large" block @click="handleLaunch">
                 <template #icon><NIcon><PlayOutline /></NIcon></template>
-                启动修改器
+                {{ t('detail.actions.launch') }}
               </NButton>
               <NButton quaternary size="large" block @click="handleDelete">
                 <template #icon><NIcon><TrashOutline /></NIcon></template>
-                删除
+                {{ t('detail.actions.delete') }}
               </NButton>
             </template>
             <template v-else>
               <NButton type="primary" size="large" block @click="handleDownload">
                 <template #icon><NIcon><DownloadOutline /></NIcon></template>
-                下载修改器
+                {{ t('detail.actions.download') }}
               </NButton>
             </template>
           </div>
         </div>
 
-        <!-- 右侧信息 -->
         <div class="info-section">
           <h1 class="trainer-name">{{ trainer.name }}</h1>
 
-          <!-- 元信息 -->
           <div class="meta-grid">
             <div class="meta-card">
               <NIcon size="20" color="#7c3aed"><CodeOutline /></NIcon>
               <div class="meta-content">
-                <span class="meta-label">版本</span>
+                <span class="meta-label">{{ t('detail.meta.version') }}</span>
                 <span class="meta-value">{{ trainer.version }}</span>
               </div>
             </div>
             <div class="meta-card">
               <NIcon size="20" color="#0891b2"><GameControllerOutline /></NIcon>
               <div class="meta-content">
-                <span class="meta-label">游戏版本</span>
+                <span class="meta-label">{{ t('detail.meta.gameVersion') }}</span>
                 <span class="meta-value">{{ trainer.game_version }}</span>
               </div>
             </div>
             <div class="meta-card">
               <NIcon size="20" color="#059669"><DownloadOutline /></NIcon>
               <div class="meta-content">
-                <span class="meta-label">下载量</span>
+                <span class="meta-label">{{ t('detail.meta.downloads') }}</span>
                 <span class="meta-value">{{ formatNumber(trainer.download_count) }}</span>
               </div>
             </div>
             <div class="meta-card">
               <NIcon size="20" color="#d97706"><TimeOutline /></NIcon>
               <div class="meta-content">
-                <span class="meta-label">更新时间</span>
+                <span class="meta-label">{{ t('detail.meta.lastUpdate') }}</span>
                 <span class="meta-value">{{ trainer.last_update }}</span>
               </div>
             </div>
           </div>
 
-          <!-- 描述 -->
           <div class="description-card">
-            <h3>功能说明</h3>
-            <pre class="description-text">{{ trainer.description || '暂无描述' }}</pre>
+            <h3>{{ t('detail.description.title') }}</h3>
+            <pre class="description-text">{{ trainer.description || t('detail.description.empty') }}</pre>
           </div>
         </div>
       </div>
@@ -255,7 +246,6 @@ onMounted(fetchDetail)
   gap: 32px;
 }
 
-/* 左侧 */
 .cover-section {
   position: sticky;
   top: 24px;
@@ -303,7 +293,6 @@ onMounted(fetchDetail)
   color: #64748b;
 }
 
-/* 右侧 */
 .trainer-name {
   font-size: 1.75rem;
   font-weight: 800;
@@ -369,7 +358,6 @@ onMounted(fetchDetail)
   font-family: inherit;
 }
 
-/* 响应式 */
 @media (max-width: 900px) {
   .detail-layout {
     grid-template-columns: 1fr;

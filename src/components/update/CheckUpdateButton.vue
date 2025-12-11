@@ -28,13 +28,13 @@ import {
   getAppVersion,
   initUpdateListener,
 } from '../../services/updaterService'
+import { useI18n } from 'vue-i18n'
 
-// 当前版本
+const { t } = useI18n()
+
 const currentVersion = ref('')
-// 是否显示更新对话框
 const showUpdateDialog = ref(false)
 
-// 获取当前版本
 const getCurrentVersion = async () => {
   try {
     currentVersion.value = await getAppVersion()
@@ -43,18 +43,16 @@ const getCurrentVersion = async () => {
   }
 }
 
-// 按钮文本
 const buttonText = computed(() => {
   if (isCheckingUpdate.value) {
-    return '检查中...'
+    return t('update.checking')
   }
   if (hasUpdate.value) {
-    return '有新版本可用'
+    return t('update.foundTitle')
   }
-  return '检查更新'
+  return t('update.check')
 })
 
-// 检查更新
 const checkUpdate = async () => {
   if (isCheckingUpdate.value) return
 
@@ -63,12 +61,10 @@ const checkUpdate = async () => {
   if (updateResult?.has_update) {
     showUpdateDialog.value = true
   } else if (updateResult) {
-    // 显示已是最新版本的消息
-    window.$message?.success('当前已是最新版本')
+    window.$message?.success(t('update.upToDate'))
   }
 }
 
-// 在组件挂载时获取当前版本并初始化更新监听器
 onMounted(async () => {
   await getCurrentVersion()
   await initUpdateListener()

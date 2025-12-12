@@ -2,13 +2,15 @@ use crate::api::error::{AppError, AppResult};
 use crate::api::trainer::PaginatedResponse;
 use crate::models::trainer::{Trainer, TrainerInstallInfo};
 use crate::services::download_manager;
+use crate::services::storage;
 use crate::services::scraper;
 use crate::services::settings;
 use crate::utils::path::sanitize_filename;
 use crate::utils::zip::extract_zip;
-use chrono::Local;
+use chrono::{Local, Utc};
 use std::fs;
 use std::io::Read;
+use std::io::Write;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -64,18 +66,21 @@ pub async fn download_trainer<R: tauri::Runtime>(
     // 生成标准化的修改器目录名
     let safe_name = sanitize_filename(&trainer.name);
     let trainer_dir_name = format!("{}_{}", safe_name, trainer.id);
-    let trainer_dir = download_dir.join(&trainer_dir_name);
+    let final_dir = download_dir.join(&trainer_dir_name);
 
-    // 如果目录已存在，先删除
-    if trainer_dir.exists() {
-        fs::remove_dir_all(&trainer_dir)?;
+    // 使用临时目录，确保失败不污染正式目录
+    let staging_dir = download_dir.join(format!(
+        "._tmp_{}_{}",
+        trainer.id,
+        chrono::Utc::now().timestamp_millis()
+    ));
+    if staging_dir.exists() {
+        fs::remove_dir_all(&staging_dir)?;
     }
-
-    // 创建修改器目录
-    fs::create_dir_all(&trainer_dir)?;
+    fs::create_dir_all(&staging_dir)?;
 
     // 临时zip文件
-    let temp_zip = download_dir.join(format!("temp_{}.zip", trainer.id));
+    let temp_zip = staging_dir.join("package.zip");
     if temp_zip.exists() {
         fs::remove_file(&temp_zip)?;
     }
@@ -120,10 +125,10 @@ pub async fn download_trainer<R: tauri::Runtime>(
     if is_zip_file {
         // 如果是ZIP文件，解压
         println!("检测到ZIP文件，开始解压...");
-        if let Err(e) = extract_zip(&temp_zip, &trainer_dir) {
+        if let Err(e) = extract_zip(&temp_zip, &staging_dir) {
             println!("解压失败: {}", e);
-            fs::remove_dir_all(&trainer_dir)?;
-            fs::remove_file(&temp_zip)?;
+            let _ = fs::remove_dir_all(&staging_dir);
+            let _ = fs::remove_file(&temp_zip);
             return Err(e);
         }
         // 解压后删除临时文件
@@ -132,15 +137,15 @@ pub async fn download_trainer<R: tauri::Runtime>(
         // 如果是EXE文件，直接移动到目标目录
         println!("检测到EXE文件，直接使用...");
         let exe_filename = format!("{}.exe", trainer.id);
-        let target_exe_path = trainer_dir.join(&exe_filename);
+        let target_exe_path = staging_dir.join(&exe_filename);
         fs::rename(&temp_zip, &target_exe_path)?;
     } else {
         // 未知文件类型，尝试作为ZIP处理
         println!("未知文件类型，尝试作为ZIP处理...");
-        if let Err(e) = extract_zip(&temp_zip, &trainer_dir) {
+        if let Err(e) = extract_zip(&temp_zip, &staging_dir) {
             println!("解压失败，尝试直接复制文件: {}", e);
             // 解压失败，直接复制文件到目标目录
-            let target_file_path = trainer_dir.join(format!("unknown_file_{}.bin", trainer.id));
+            let target_file_path = staging_dir.join(format!("unknown_file_{}.bin", trainer.id));
             fs::copy(&temp_zip, &target_file_path)?;
             fs::remove_file(&temp_zip)?;
         } else {
@@ -149,16 +154,65 @@ pub async fn download_trainer<R: tauri::Runtime>(
         }
     }
 
-    // 保存安装信息
+    // 处理目录切换，先备份旧目录，确保状态可恢复
+    let backup_dir = download_dir.join(format!("{}_backup", trainer_dir_name));
+    if backup_dir.exists() {
+        fs::remove_dir_all(&backup_dir)?;
+    }
+    if final_dir.exists() {
+        fs::rename(&final_dir, &backup_dir)?;
+    }
+
+    if let Err(rename_err) = fs::rename(&staging_dir, &final_dir) {
+        // 恢复旧目录
+        if backup_dir.exists() {
+            let _ = fs::rename(&backup_dir, &final_dir);
+        }
+        return Err(AppError::ExecutionError(format!(
+            "切换修改器目录失败: {}",
+            rename_err
+        )));
+    }
+    // 清理备份
+    if backup_dir.exists() {
+        let _ = fs::remove_dir_all(&backup_dir);
+    }
+
+    // 保存安装信息（文件 + 数据库）
+    let install_time = Local::now().to_rfc3339();
     let install_info = TrainerInstallInfo {
         trainer: trainer.clone(),
-        install_path: trainer_dir.to_string_lossy().to_string(),
-        install_time: Local::now().to_rfc3339(),
+        install_path: final_dir.to_string_lossy().to_string(),
+        install_time: install_time.clone(),
         last_launch_time: None,
     };
 
     let info_json = serde_json::to_string_pretty(&install_info)?;
-    fs::write(trainer_dir.join("trainer.json"), info_json)?;
+    let mut info_file = fs::File::create(final_dir.join("trainer.json"))?;
+    info_file.write_all(info_json.as_bytes())?;
+
+    // 同步数据库，确保前端状态与文件一致
+    let installed_record = crate::models::trainer::InstalledTrainer {
+        id: trainer.id.clone(),
+        name: trainer.name.clone(),
+        version: trainer.version.clone(),
+        game_version: trainer.game_version.clone(),
+        download_url: trainer.download_url.clone(),
+        description: trainer.description.clone(),
+        thumbnail: trainer.thumbnail.clone(),
+        download_count: trainer.download_count,
+        last_update: trainer.last_update.clone(),
+        installed_path: final_dir.to_string_lossy().to_string(),
+        install_time: install_time.clone(),
+        last_launch_time: install_time.clone(),
+    };
+    storage::upsert_installed_trainer(installed_record)
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("更新安装列表失败: {}", e)))?;
+
+    storage::upsert_downloaded_trainer(trainer.clone())
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("更新下载列表失败: {}", e)))?;
 
     // 发送完成进度
     let _ = app_handle.emit(
@@ -173,7 +227,7 @@ pub async fn download_trainer<R: tauri::Runtime>(
         }),
     );
 
-    Ok(trainer_dir)
+    Ok(final_dir)
 }
 
 // 检测文件是否为ZIP格式
@@ -218,23 +272,31 @@ fn is_exe_file(file_path: &PathBuf) -> bool {
 }
 
 pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
-    let download_dir = settings::get_download_path()?;
-    let mut trainer_path = None;
-    let mut executable_path = None;
+    // 优先从数据库读取安装路径，确保数据与文件同步
+    let trainer_record = storage::get_installed_trainer_by_id(&trainer_id)
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("查询安装记录失败: {}", e)))?;
 
-    if let Ok(entries) = fs::read_dir(&download_dir) {
-        for entry in entries.flatten() {
-            if let Ok(path) = entry.path().canonicalize() {
-                if path.is_dir() {
-                    let info_path = path.join("trainer.json");
-                    if info_path.exists() {
-                        if let Ok(content) = fs::read_to_string(&info_path) {
-                            if let Ok(install_info) =
-                                serde_json::from_str::<TrainerInstallInfo>(&content)
-                            {
-                                if install_info.trainer.id == trainer_id {
-                                    trainer_path = Some(path);
-                                    break;
+    let trainer_dir = if let Some(record) = trainer_record {
+        PathBuf::from(record.installed_path)
+    } else {
+        // 兼容旧数据：回退到扫描文件
+        let download_dir = settings::get_download_path()?;
+        let mut fallback_path = None;
+        if let Ok(entries) = fs::read_dir(&download_dir) {
+            for entry in entries.flatten() {
+                if let Ok(path) = entry.path().canonicalize() {
+                    if path.is_dir() {
+                        let info_path = path.join("trainer.json");
+                        if info_path.exists() {
+                            if let Ok(content) = fs::read_to_string(&info_path) {
+                                if let Ok(install_info) =
+                                    serde_json::from_str::<TrainerInstallInfo>(&content)
+                                {
+                                    if install_info.trainer.id == trainer_id {
+                                        fallback_path = Some(path);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -242,11 +304,7 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
                 }
             }
         }
-    }
-
-    let trainer_dir = match trainer_path {
-        Some(path) => path,
-        None => return Err(AppError::NotFoundError("修改器未找到".to_string())),
+        fallback_path.ok_or_else(|| AppError::NotFoundError("修改器未找到".to_string()))?
     };
 
     // 查找可执行文件 (EXE)
@@ -323,33 +381,52 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
     }
 
     // 更新最后启动时间
+    let now = Local::now().to_rfc3339();
     if let Ok(content) = fs::read_to_string(trainer_dir.join("trainer.json")) {
         if let Ok(mut install_info) = serde_json::from_str::<TrainerInstallInfo>(&content) {
-            install_info.last_launch_time = Some(Local::now().to_rfc3339());
+            install_info.last_launch_time = Some(now.clone());
             let updated_json = serde_json::to_string_pretty(&install_info)?;
             fs::write(trainer_dir.join("trainer.json"), updated_json)?;
         }
     }
 
+    // 同步数据库启动时间
+    storage::update_last_launch_time(&trainer_id, &now)
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("更新启动时间失败: {}", e)))?;
+
     Ok(())
 }
 
-pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
-    let download_dir = settings::get_download_path()?;
+pub async fn delete_trainer(trainer_id: String) -> AppResult<()> {
+    // 获取路径信息
+    let installed = storage::get_installed_trainer_by_id(&trainer_id)
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("查询安装记录失败: {}", e)))?;
 
-    if let Ok(entries) = fs::read_dir(download_dir) {
-        for entry in entries.flatten() {
-            if let Ok(path) = entry.path().canonicalize() {
-                if path.is_dir() {
-                    let info_path = path.join("trainer.json");
-                    if info_path.exists() {
-                        if let Ok(content) = fs::read_to_string(&info_path) {
-                            if let Ok(install_info) =
-                                serde_json::from_str::<TrainerInstallInfo>(&content)
-                            {
-                                if install_info.trainer.id == trainer_id {
-                                    fs::remove_dir_all(path)?;
-                                    break;
+    // 优先删除目录
+    if let Some(record) = installed {
+        let path = PathBuf::from(record.installed_path);
+        if path.exists() {
+            fs::remove_dir_all(path)?;
+        }
+    } else {
+        // 兼容旧数据，按文件扫描
+        let download_dir = settings::get_download_path()?;
+        if let Ok(entries) = fs::read_dir(download_dir) {
+            for entry in entries.flatten() {
+                if let Ok(path) = entry.path().canonicalize() {
+                    if path.is_dir() {
+                        let info_path = path.join("trainer.json");
+                        if info_path.exists() {
+                            if let Ok(content) = fs::read_to_string(&info_path) {
+                                if let Ok(install_info) =
+                                    serde_json::from_str::<TrainerInstallInfo>(&content)
+                                {
+                                    if install_info.trainer.id == trainer_id {
+                                        fs::remove_dir_all(path)?;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -358,6 +435,14 @@ pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
             }
         }
     }
+
+    // 同步数据库
+    storage::remove_installed_trainer(&trainer_id)
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("移除安装记录失败: {}", e)))?;
+    storage::remove_downloaded_trainer(&trainer_id)
+        .await
+        .map_err(|e| AppError::ExecutionError(format!("移除下载记录失败: {}", e)))?;
 
     Ok(())
 }

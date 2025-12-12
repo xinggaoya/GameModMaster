@@ -47,8 +47,8 @@ pub async fn download_trainer<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn delete_trainer(trainer_id: String) -> AppResult<()> {
-    trainer_service::delete_trainer(trainer_id)
+pub async fn delete_trainer(trainer_id: String) -> AppResult<()> {
+    trainer_service::delete_trainer(trainer_id).await
 }
 
 #[tauri::command]

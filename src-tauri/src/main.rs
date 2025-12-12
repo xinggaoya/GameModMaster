@@ -24,9 +24,13 @@ fn main() {
     );
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // 初始化 SQLite 存储，失败时仅打印警告以避免阻塞启动
+            if let Err(e) = tauri::async_runtime::block_on(services::storage::init_db()) {
+                println!("警告: 无法初始化本地数据库: {}", e);
+            }
+
             // 创建系统托盘
             let show_item = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
             let hide_item = MenuItemBuilder::with_id("hide", "隐藏主窗口").build(app)?;

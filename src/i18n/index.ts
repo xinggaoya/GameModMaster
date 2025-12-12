@@ -113,6 +113,7 @@ const messages = {
         download: '下载设置',
         appearance: '外观',
         about: '关于',
+        update: '更新',
       },
       fields: {
         downloadPath: {
@@ -153,6 +154,7 @@ const messages = {
         selectFolderFailed: '选择文件夹失败',
         openFolderFailed: '打开文件夹失败',
         autoSaveThemeFailed: '自动保存主题失败',
+        checkUpdateFailed: '检查更新失败，请稍后再试',
       },
     },
     update: {
@@ -333,6 +335,7 @@ const messages = {
         download: 'Download',
         appearance: 'Appearance',
         about: 'About',
+        update: 'Updates',
       },
       fields: {
         downloadPath: {
@@ -373,6 +376,7 @@ const messages = {
         selectFolderFailed: 'Failed to select folder',
         openFolderFailed: 'Failed to open folder',
         autoSaveThemeFailed: 'Failed to auto-save theme',
+        checkUpdateFailed: 'Failed to check for updates, please retry later',
       },
     },
     update: {
@@ -553,6 +557,7 @@ const messages = {
         download: 'Descarga',
         appearance: 'Apariencia',
         about: 'Acerca de',
+        update: 'Actualizaciones',
       },
       fields: {
         downloadPath: {
@@ -593,6 +598,7 @@ const messages = {
         selectFolderFailed: 'No se pudo seleccionar la carpeta',
         openFolderFailed: 'No se pudo abrir la carpeta',
         autoSaveThemeFailed: 'No se pudo guardar el tema automáticamente',
+        checkUpdateFailed: 'No se pudieron buscar actualizaciones, inténtalo más tarde',
       },
     },
     update: {
@@ -773,6 +779,7 @@ const messages = {
         download: 'Téléchargement',
         appearance: 'Apparence',
         about: 'À propos',
+        update: 'Mises à jour',
       },
       fields: {
         downloadPath: {
@@ -813,6 +820,7 @@ const messages = {
         selectFolderFailed: 'Impossible de choisir le dossier',
         openFolderFailed: 'Impossible d’ouvrir le dossier',
         autoSaveThemeFailed: 'Impossible d’enregistrer le thème automatiquement',
+        checkUpdateFailed: 'Impossible de vérifier les mises à jour, veuillez réessayer',
       },
     },
     update: {
@@ -993,6 +1001,7 @@ const messages = {
         download: 'ダウンロード',
         appearance: '外観',
         about: '概要',
+        update: 'アップデート',
       },
       fields: {
         downloadPath: {
@@ -1033,6 +1042,7 @@ const messages = {
         selectFolderFailed: 'フォルダーを選択できませんでした',
         openFolderFailed: 'フォルダーを開けませんでした',
         autoSaveThemeFailed: 'テーマの自動保存に失敗しました',
+        checkUpdateFailed: 'アップデートの確認に失敗しました。時間をおいて再度お試しください',
       },
     },
     update: {

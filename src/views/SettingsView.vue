@@ -9,9 +9,22 @@ import {
   LogoGithub,
   CheckmarkCircleOutline,
   GameControllerOutline,
+  RefreshOutline,
+  ArrowUpCircleOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { setLocale, supportedLanguages, type Locale } from '@/i18n'
+import UpdateDialog from '@/components/update/UpdateDialog.vue'
+import {
+  checkForUpdates,
+  getAppVersion,
+  hasUpdate,
+  initUpdateListener,
+  isCheckingUpdate,
+  isDownloading,
+  updateInfo,
+  updateProgress,
+} from '@/services/updaterService'
 
 type ThemeSetting = 'light' | 'dark' | 'system'
 
@@ -39,6 +52,7 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const appVersion = ref('')
 const isInitialized = ref(false)
+const showUpdateDialog = ref(false)
 
 const themeOptions = computed(() => [
   { label: t('settings.themeOptions.system'), value: 'system' },
@@ -112,12 +126,13 @@ watch(() => settings.value.language, async (newLang: Locale) => {
 const loadSettings = async () => {
   try {
     isLoading.value = true
+    await initUpdateListener()
     const result = await invoke<AppSettings>('get_settings')
     settings.value = {
       ...settings.value,
       ...result,
     }
-    appVersion.value = await invoke<string>('get_app_version')
+    appVersion.value = await getAppVersion()
 
     applyTheme((settings.value.theme || 'system') as ThemeSetting)
     if (settings.value.language) {
@@ -132,6 +147,44 @@ const loadSettings = async () => {
       isInitialized.value = true
     }
     isLoading.value = false
+  }
+}
+
+const updateStatusText = computed(() => {
+  if (isDownloading.value) {
+    return updateProgress.value.message || t('update.downloadingTitle')
+  }
+  if (isCheckingUpdate.value) {
+    return t('update.checking')
+  }
+  if (hasUpdate.value && updateInfo.value) {
+    return `${t('update.foundTitle')} · v${updateInfo.value.latest_version}`
+  }
+  if (updateInfo.value && !updateInfo.value.has_update) {
+    return t('update.upToDate')
+  }
+  return t('update.check')
+})
+
+const updateStatusType = computed(() => {
+  if (isDownloading.value) return 'warning'
+  if (hasUpdate.value) return 'success'
+  if (isCheckingUpdate.value) return 'info'
+  if (updateInfo.value && !updateInfo.value.has_update) return 'default'
+  return 'info'
+})
+
+const handleCheckUpdate = async () => {
+  try {
+    const result = await checkForUpdates()
+    if (result?.has_update) {
+      showUpdateDialog.value = true
+    } else if (result) {
+      message.success(t('update.upToDate'))
+    }
+  } catch (error) {
+    console.error('check update failed:', error)
+    message.error(t('settings.messages.checkUpdateFailed'))
   }
 }
 
@@ -268,6 +321,56 @@ onMounted(loadSettings)
         <section class="settings-section">
           <div class="section-header">
             <NIcon size="20" class="section-icon">
+              <ArrowUpCircleOutline />
+            </NIcon>
+            <h2 class="section-title">{{ t('settings.sections.update') }}</h2>
+          </div>
+
+          <div class="update-panel">
+            <div class="update-info">
+              <div class="meta-row">
+                <div class="meta-label">{{ t('update.currentVersion') }}</div>
+                <div class="meta-value">v{{ appVersion || '0.0.0' }}</div>
+              </div>
+              <div class="meta-row" v-if="updateInfo && updateInfo.latest_version">
+                <div class="meta-label">{{ t('update.latestVersion') }}</div>
+                <div class="meta-value highlight">v{{ updateInfo.latest_version }}</div>
+              </div>
+              <div class="status-chip" :data-type="updateStatusType">
+                {{ updateStatusText }}
+              </div>
+            </div>
+            <div class="update-actions">
+              <NButton
+                type="primary"
+                size="large"
+                :loading="isCheckingUpdate"
+                @click="handleCheckUpdate"
+              >
+                <template #icon>
+                  <NIcon><RefreshOutline /></NIcon>
+                </template>
+                {{ hasUpdate ? t('update.start') : t('update.check') }}
+              </NButton>
+              <NButton
+                secondary
+                strong
+                size="large"
+                :disabled="!hasUpdate"
+                @click="showUpdateDialog = true"
+              >
+                <template #icon>
+                  <NIcon><ArrowUpCircleOutline /></NIcon>
+                </template>
+                {{ t('update.foundTitle') }}
+              </NButton>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-header">
+            <NIcon size="20" class="section-icon">
               <InformationCircleOutline />
             </NIcon>
             <h2 class="section-title">{{ t('settings.sections.about') }}</h2>
@@ -313,6 +416,8 @@ onMounted(loadSettings)
         </NButton>
       </div>
     </NSpin>
+
+    <UpdateDialog v-model:show="showUpdateDialog" :current-version="appVersion || '0.0.0'" />
   </div>
 </template>
 
@@ -520,6 +625,98 @@ onMounted(loadSettings)
     flex-direction: column;
     gap: 16px;
     align-items: flex-start;
+  }
+}
+
+.update-panel {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(8, 145, 178, 0.08));
+  border: 1px solid var(--divider-color);
+  border-radius: 18px;
+  padding: 18px 20px;
+}
+
+.update-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meta-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.meta-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  min-width: 96px;
+}
+
+.meta-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.meta-value.highlight {
+  color: #7c3aed;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #e2e8f0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.status-chip[data-type='success'] {
+  background: rgba(34, 197, 94, 0.15);
+  color: #166534;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.status-chip[data-type='warning'] {
+  background: rgba(249, 115, 22, 0.15);
+  color: #9a3412;
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.status-chip[data-type='info'] {
+  background: rgba(8, 145, 178, 0.12);
+  color: #0f172a;
+  border-color: rgba(8, 145, 178, 0.3);
+}
+
+.update-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .update-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .update-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .update-actions .n-button {
+    flex: 1;
   }
 }
 </style>

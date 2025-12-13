@@ -25,6 +25,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             // 初始化 SQLite 存储，失败时仅打印警告以避免阻塞启动
             if let Err(e) = tauri::async_runtime::block_on(services::storage::init_db()) {

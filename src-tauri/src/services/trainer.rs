@@ -308,6 +308,7 @@ pub async fn launch_trainer(trainer_id: String) -> AppResult<()> {
     };
 
     // 查找可执行文件 (EXE)
+    let mut executable_path: Option<PathBuf> = None;
     if let Ok(entries) = fs::read_dir(&trainer_dir) {
         for entry in entries.flatten() {
             if let Ok(path) = entry.path().canonicalize() {

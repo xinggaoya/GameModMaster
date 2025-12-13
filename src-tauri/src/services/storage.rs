@@ -35,13 +35,13 @@ fn get_db_path() -> Result<PathBuf> {
 async fn with_conn<T, F>(f: F) -> Result<T>
 where
     T: Send + 'static,
-    F: FnOnce(Connection) -> Result<T> + Send + 'static,
+    F: FnOnce(&mut Connection) -> Result<T> + Send + 'static,
 {
     let db_path = get_db_path()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let conn = Connection::open(db_path)?;
+        let mut conn = Connection::open(db_path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        f(conn)
+        f(&mut conn)
     })
     .await
     .context("数据库线程池执行失败")?
@@ -99,7 +99,7 @@ pub async fn init_db() -> Result<()> {
             );
             ",
         )?;
-        Ok(())
+        Ok::<(), rusqlite::Error>(())
     })
     .await
     .context("初始化数据库失败")??;
@@ -112,31 +112,33 @@ pub async fn save_installed_trainers(trainers: Vec<InstalledTrainer>) -> Result<
         let tx = conn.transaction()?;
         tx.execute("DELETE FROM installed_trainers", [])?;
 
-        let mut stmt = tx.prepare(
-            "
-            INSERT INTO installed_trainers (
-                id, name, version, game_version, download_url,
-                description, thumbnail, download_count, last_update,
-                installed_path, install_time, last_launch_time
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-            ",
-        )?;
+        {
+            let mut stmt = tx.prepare(
+                "
+                INSERT INTO installed_trainers (
+                    id, name, version, game_version, download_url,
+                    description, thumbnail, download_count, last_update,
+                    installed_path, install_time, last_launch_time
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                ",
+            )?;
 
-        for t in trainers {
-            stmt.execute(params![
-                t.id,
-                t.name,
-                t.version,
-                t.game_version,
-                t.download_url,
-                t.description,
-                t.thumbnail,
-                t.download_count,
-                t.last_update,
-                t.installed_path,
-                t.install_time,
-                t.last_launch_time,
-            ])?;
+            for t in trainers {
+                stmt.execute(params![
+                    t.id,
+                    t.name,
+                    t.version,
+                    t.game_version,
+                    t.download_url,
+                    t.description,
+                    t.thumbnail,
+                    t.download_count,
+                    t.last_update,
+                    t.installed_path,
+                    t.install_time,
+                    t.last_launch_time,
+                ])?;
+            }
         }
 
         tx.commit()?;
@@ -187,27 +189,29 @@ pub async fn save_downloaded_trainers(trainers: Vec<Trainer>) -> Result<()> {
         let tx = conn.transaction()?;
         tx.execute("DELETE FROM downloaded_trainers", [])?;
 
-        let mut stmt = tx.prepare(
-            "
-            INSERT INTO downloaded_trainers (
-                id, name, version, game_version, download_url,
-                description, thumbnail, download_count, last_update
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            ",
-        )?;
+        {
+            let mut stmt = tx.prepare(
+                "
+                INSERT INTO downloaded_trainers (
+                    id, name, version, game_version, download_url,
+                    description, thumbnail, download_count, last_update
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                ",
+            )?;
 
-        for t in trainers {
-            stmt.execute(params![
-                t.id,
-                t.name,
-                t.version,
-                t.game_version,
-                t.download_url,
-                t.description,
-                t.thumbnail,
-                t.download_count,
-                t.last_update
-            ])?;
+            for t in trainers {
+                stmt.execute(params![
+                    t.id,
+                    t.name,
+                    t.version,
+                    t.game_version,
+                    t.download_url,
+                    t.description,
+                    t.thumbnail,
+                    t.download_count,
+                    t.last_update
+                ])?;
+            }
         }
 
         tx.commit()?;
